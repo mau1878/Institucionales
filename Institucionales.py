@@ -76,33 +76,33 @@ def calculate_concentration_metrics(holder_data):
 
 def main():
     st.set_page_config(page_title="Análisis de Tenencias Institucionales", page_icon="📊", layout="wide")
-    
+
     st.markdown("""
     <div style='text-align: right; color: gray; padding-bottom: 20px;'>
         Desarrollado por <a href='https://twitter.com/MTaurus_ok' target='_blank'>MTaurus</a> (@MTaurus_ok)
     </div>
     """, unsafe_allow_html=True)
-    
+
     st.title("Análisis de Tenencias Institucionales")
-    
+
     df = load_and_prepare_data()
     holders = sorted(df['Holder'].unique())
-    
+
     # Create tabs for different views
     tab1, tab2 = st.tabs(["Vista Individual", "Análisis Comparativo"])
-    
+
     with tab1:
         # Original single-institution view
         selected_holder = st.sidebar.selectbox(
             "Seleccionar Institución",
             holders
         )
-        
+
         holder_data = df[df['Holder'] == selected_holder].copy()
         holder_data_sorted = holder_data.sort_values('% Out', ascending=False)
-        
+
         st.header(f"Análisis de Tenencias para {selected_holder}")
-        
+
         # Original metrics
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -111,14 +111,14 @@ def main():
             st.metric("% Promedio de Acciones en Circulación", f"{holder_data['% Out'].mean():.2f}%")
         with col3:
             st.metric("Valor Total", f"${holder_data['Value'].sum():,.0f}")
-        
+
         # Add concentration metrics
         st.subheader("Métricas de Concentración")
         metrics = calculate_concentration_metrics(holder_data)
         metric_cols = st.columns(len(metrics))
         for col, (metric_name, value) in zip(metric_cols, metrics.items()):
             col.metric(metric_name, value)
-        
+
         # Original bar plot
         fig = px.bar(
             holder_data_sorted,
@@ -130,7 +130,7 @@ def main():
             color_continuous_scale='Viridis',
             height=500
         )
-        
+
         fig.add_annotation(
             text="MTaurus: X: @MTaurus_ok",
             xref="paper",
@@ -141,16 +141,15 @@ def main():
             font=dict(size=20, color="rgba(150,150,150,0.2)"),
             textangle=-30
         )
-        
+
         fig.update_layout(
             xaxis_tickangle=-45,
             showlegend=True,
-            coloraxis_colorbar_title="Valor ($)",
-            coloraxis_colorbar_tickformat="$,.0f"
+            coloraxis_colorbar_title="Valor ($)"
         )
-        
+
         st.plotly_chart(fig, use_container_width=True)
-        
+
         # Original detailed data table
         st.subheader("Datos Detallados de Tenencias")
         display_df = pd.DataFrame({
@@ -160,20 +159,21 @@ def main():
             'Valor ($)': holder_data_sorted['Value'],
             'Fecha Reportada': holder_data_sorted['Date Reported']
         })
-        
+
         st.dataframe(
             display_df,
             column_config={
                 "Ticker": st.column_config.TextColumn("Ticker", width="small"),
                 "Acciones (M)": st.column_config.NumberColumn("Acciones (M)", format="%.2f M"),
-                "% de Acciones en Circulación": st.column_config.NumberColumn("% de Acciones en Circulación", format="%.2f%%"),
-                "Valor ($)": st.column_config.NumberColumn("Valor ($)", format="$%,.0f"),
+                "% de Acciones en Circulación": st.column_config.NumberColumn("% de Acciones en Circulación",
+                                                                              format="%.2f%%"),
+                "Valor ($)": st.column_config.NumberColumn("Valor ($)", format="$%d"),
             },
             hide_index=True,
             use_container_width=True,
             height=400
         )
-    
+
     with tab2:
         # Multi-institution analysis
         selected_holders = st.multiselect(
@@ -182,18 +182,18 @@ def main():
             default=[holders[0]],
             max_selections=10
         )
-        
+
         if selected_holders:
             # Heatmap
             st.subheader("Mapa de Calor de Participaciones")
             heatmap = create_heatmap(df, selected_holders)
             st.plotly_chart(heatmap, use_container_width=True)
-            
+
             # Top 10 holdings for each selected institution
             st.subheader("Top 10 Holdings por Institución")
             for holder in selected_holders:
                 holder_data = df[df['Holder'] == holder].sort_values('Value', ascending=False).head(10)
-                
+
                 fig = px.bar(
                     holder_data,
                     x='Ticker',
@@ -202,69 +202,22 @@ def main():
                     labels={'Value': 'Valor ($)', 'Ticker': 'Empresa'},
                     color='% Out'
                 )
-                fig.update_layout(
-                    xaxis_tickangle=-45,
-                    yaxis_tickformat="$,.0f"
-                )
+                fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True)
-                
-                # Display top 10 holdings table
-                st.dataframe(
-                    holder_data[['Ticker', 'Shares', '% Out', 'Value', 'Date Reported']],
-                    column_config={
-                        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                        "Shares": st.column_config.NumberColumn("Acciones (M)", format="%.2f M"),
-                        "% Out": st.column_config.NumberColumn("% de Acciones en Circulación", format="%.2f%%"),
-                        "Value": st.column_config.NumberColumn("Valor ($)", format="$%,.0f"),
-                        "Date Reported": "Fecha Reportada"
-                    },
-                    hide_index=True,
-                    use_container_width=True
-                )
-            
-            # Overlapping positions analysis
-            st.subheader("Análisis de Posiciones Comunes")
-            min_overlap = st.slider(
-                "Número mínimo de instituciones con la misma posición",
-                2,
-                len(selected_holders),
-                2
-            )
-            
-            overlapping = find_overlapping_positions(df, selected_holders, min_overlap)
-            if not overlapping.empty:
-                pivot_overlap = overlapping.pivot_table(
-                    index='Ticker',
-                    columns='Holder',
-                    values=['% Out', 'Value'],
-                    aggfunc={'% Out': 'first', 'Value': 'first'}
-                ).fillna(0)
-                
-                # Format the pivot table for display
-                for holder in selected_holders:
-                    if ('Value', holder) in pivot_overlap.columns:
-                        pivot_overlap[('Value', holder)] = pivot_overlap[('Value', holder)].map('${:,.0f}'.format)
-                    if ('% Out', holder) in pivot_overlap.columns:
-                        pivot_overlap[('% Out', holder)] = pivot_overlap[('% Out', holder)].map('{:.2f}%'.format)
-                
-                st.dataframe(pivot_overlap)
-            else:
-                st.warning("No se encontraron posiciones superpuestas con los criterios seleccionados.")
-    
+        else:
+            st.warning("Por favor, seleccione al menos una institución para el análisis comparativo.")
+
     # Download button
     st.subheader("Descargar Datos")
-    if 'selected_holder' in locals():  # For single institution view
-        csv = holder_data_sorted.to_csv(index=False)
-        st.download_button(
-            label="Descargar Datos en CSV",
-            data=csv,
-            file_name=f"{selected_holder}_tenencias.csv",
-            mime="text/csv",
-            help="Haga clic para descargar los datos filtrados en formato CSV"
-        )
+    csv = holder_data_sorted.to_csv(index=False)
+    st.download_button(
+        label="Descargar Datos en CSV",
+        data=csv,
+        file_name=f"{selected_holder}_tenencias.csv",
+        mime="text/csv",
+        help="Haga clic para descargar los datos filtrados en formato CSV"
+    )
 
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()
