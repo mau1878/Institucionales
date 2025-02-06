@@ -5,6 +5,10 @@ import plotly.graph_objects as go
 import numpy as np
 
 
+def format_currency(value):
+    return f"${value:,.0f}"
+
+
 def convert_shares_to_millions(share_str):
     if isinstance(share_str, (int, float)):
         return share_str
@@ -151,12 +155,13 @@ def main():
         st.plotly_chart(fig, use_container_width=True)
 
         # Original detailed data table
+        # Original detailed data table
         st.subheader("Datos Detallados de Tenencias")
         display_df = pd.DataFrame({
             'Ticker': holder_data_sorted['Ticker'],
             'Acciones (M)': holder_data_sorted['Shares'],
             '% de Acciones en Circulación': holder_data_sorted['% Out'],
-            'Valor ($)': holder_data_sorted['Value'],
+            'Valor ($)': holder_data_sorted['Value'].apply(lambda x: f"${x:,.0f}"),  # Pre-format the values
             'Fecha Reportada': holder_data_sorted['Date Reported']
         })
 
@@ -167,7 +172,8 @@ def main():
                 "Acciones (M)": st.column_config.NumberColumn("Acciones (M)", format="%.2f M"),
                 "% de Acciones en Circulación": st.column_config.NumberColumn("% de Acciones en Circulación",
                                                                               format="%.2f%%"),
-                "Valor ($)": st.column_config.NumberColumn("Valor ($)", format="$%d"),
+                "Valor ($)": st.column_config.TextColumn("Valor ($)"),
+                # Changed to TextColumn since we pre-formatted the values
             },
             hide_index=True,
             use_container_width=True,
