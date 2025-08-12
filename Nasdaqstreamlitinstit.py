@@ -60,6 +60,16 @@ def color_percentage(val):
         color = 'green' if val > 0 else 'red' if val < 0 else 'black'
         return f'color: {color}'
 
+# Global date filter
+st.sidebar.header("Filtro por Fecha")
+unique_dates = sorted(merged_data['Date'].dt.date.unique())
+selected_date = st.sidebar.selectbox("Selecciona una Fecha (opcional):", [None] + unique_dates)
+
+if selected_date:
+    selected_date = pd.to_datetime(selected_date)
+    merged_data = merged_data[merged_data['Date'] == selected_date]
+    merged_data_display = merged_data_display[merged_data_display['Date'] == selected_date]
+
 # Streamlit app
 st.title("Análisis de Tenencias Institucionales")
 
