@@ -81,17 +81,17 @@ def plot_top_20(df, x, y, title, color):
     fig.update_layout(xaxis_title=x, yaxis_title=y)
     st.plotly_chart(fig)
 
-def plot_changes(df, x, y, title, is_percentage=False):
+def plot_changes(df, x, y_num, title, is_percentage=False):
     # Filter out inf for plotting
-    plot_df = df[~np.isinf(df[y])].copy()
-    plot_df = plot_df.sort_values(by=y, ascending=False)
+    plot_df = df[~np.isinf(df[y_num])].copy()
+    plot_df = plot_df.sort_values(by=y_num, ascending=False)
     top_20 = plot_df.head(20)
 
     # Define colors based on sign
-    colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in top_20[y]]
+    colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in top_20[y_num]]
 
-    fig = go.Figure(data=[go.Bar(x=top_20[x], y=top_20[y], marker_color=colors)])
-    fig.update_layout(title=title, xaxis_title=x, yaxis_title=y + (' %' if is_percentage else ''))
+    fig = go.Figure(data=[go.Bar(x=top_20[x], y=top_20[y_num], marker_color=colors)])
+    fig.update_layout(title=title, xaxis_title=x, yaxis_title='Shares Change %' if is_percentage else 'Shares Change')
     st.plotly_chart(fig)
 
 if option == "Análisis de Tenedor Institucional":
@@ -117,7 +117,7 @@ if option == "Análisis de Tenedor Institucional":
 
     if not holder_data.empty:
         st.write(f"### Tenencias de {selected_holder}")
-        styled_df = holder_data_display[["Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.applymap(color_percentage, subset=["Shares Change %"])
+        styled_df = holder_data_display[["Date", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
         st.dataframe(styled_df)
 
         # Plot for shares held
@@ -134,7 +134,7 @@ if option == "Análisis de Tenedor Institucional":
 
         # New plot for shares change %
         st.write("### Cambio en Acciones % por Empresa")
-        plot_changes(holder_data, "Ticker", "Shares Change %", f"Cambio en Acciones % por Empresa de {selected_holder}", is_percentage=True)
+        plot_changes(holder_data, "Ticker", "Shares Change % num", f"Cambio en Acciones % por Empresa de {selected_holder}", is_percentage=True)
     else:
         st.write("No hay datos disponibles para el tenedor institucional seleccionado.")
 
@@ -168,7 +168,7 @@ elif option == "Análisis por Ticker":
         st.write(f"Valor Total de Tenencias: ${general_ticker_data['Total Holdings Value'].values[0]:,.0f} millones")
 
         st.write(f"### Tenedores Institucionales para {selected_ticker}")
-        styled_df = ticker_data_display[["Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.applymap(color_percentage, subset=["Shares Change %"])
+        styled_df = ticker_data_display[["Date", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
         st.dataframe(styled_df)
 
         # Plot for shares held by institutional holders
@@ -185,7 +185,7 @@ elif option == "Análisis por Ticker":
 
         # New plot for shares change %
         st.write("### Cambio en Acciones % por Tenedores Institucionales")
-        plot_changes(ticker_data, "Owner Name", "Shares Change %", f"Cambio en Acciones % por Tenedores Institucionales para {selected_ticker}", is_percentage=True)
+        plot_changes(ticker_data, "Owner Name", "Shares Change % num", f"Cambio en Acciones % por Tenedores Institucionales para {selected_ticker}", is_percentage=True)
     else:
         st.write("No hay datos disponibles para el ticker seleccionado.")
 
@@ -211,7 +211,7 @@ elif option == "Comparación":
             comparison_data_display = merged_data_display[merged_data_display['Ticker'].isin(tickers)]
             comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
             st.write("### Comparación de Tickers")
-            styled_df = comparison_data_display[["Ticker", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.applymap(color_percentage, subset=["Shares Change %"])
+            styled_df = comparison_data_display[["Date", "Ticker", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
             st.dataframe(styled_df)
 
             # Plotting
@@ -228,9 +228,9 @@ elif option == "Comparación":
             st.plotly_chart(fig)
 
             st.write("### Comparación de Cambio en Acciones % por Ticker")
-            plot_comparison_data = comparison_data[~np.isinf(comparison_data["Shares Change %"])]
-            colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in plot_comparison_data["Shares Change %"]]
-            fig = go.Figure(data=[go.Bar(x=plot_comparison_data["Ticker"] + ' - ' + plot_comparison_data["Owner Name"], y=plot_comparison_data["Shares Change %"], marker_color=colors)])
+            plot_comparison_data = comparison_data[~np.isinf(comparison_data["Shares Change % num"])]
+            colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in plot_comparison_data["Shares Change % num"]]
+            fig = go.Figure(data=[go.Bar(x=plot_comparison_data["Ticker"] + ' - ' + plot_comparison_data["Owner Name"], y=plot_comparison_data["Shares Change % num"], marker_color=colors)])
             fig.update_layout(title="Comparación de Cambio en Acciones % por Ticker", xaxis_title="Ticker - Owner", yaxis_title="Cambio en Acciones %")
             st.plotly_chart(fig)
 
@@ -241,7 +241,7 @@ elif option == "Comparación":
             comparison_data_display = merged_data_display[merged_data_display['Owner Name'].isin(holders)]
             comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
             st.write("### Comparación de Tenedores Institucionales")
-            styled_df = comparison_data_display[["Owner Name", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.applymap(color_percentage, subset=["Shares Change %"])
+            styled_df = comparison_data_display[["Date", "Owner Name", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
             st.dataframe(styled_df)
 
             # Plotting
@@ -258,9 +258,9 @@ elif option == "Comparación":
             st.plotly_chart(fig)
 
             st.write("### Comparación de Cambio en Acciones % por Tenedor Institucional")
-            plot_comparison_data = comparison_data[~np.isinf(comparison_data["Shares Change %"])]
-            colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in plot_comparison_data["Shares Change %"]]
-            fig = go.Figure(data=[go.Bar(x=plot_comparison_data["Owner Name"] + ' - ' + plot_comparison_data["Ticker"], y=plot_comparison_data["Shares Change %"], marker_color=colors)])
+            plot_comparison_data = comparison_data[~np.isinf(comparison_data["Shares Change % num"])]
+            colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in plot_comparison_data["Shares Change % num"]]
+            fig = go.Figure(data=[go.Bar(x=plot_comparison_data["Owner Name"] + ' - ' + plot_comparison_data["Ticker"], y=plot_comparison_data["Shares Change % num"], marker_color=colors)])
             fig.update_layout(title="Comparación de Cambio en Acciones % por Tenedor Institucional", xaxis_title="Owner - Ticker", yaxis_title="Cambio en Acciones %")
             st.plotly_chart(fig)
 
@@ -432,7 +432,7 @@ elif option == "Análisis Adicional":
     filtered_data = merged_data[(merged_data['Date'] >= date_range_pandas[0]) & (merged_data['Date'] <= date_range_pandas[1])]
     filtered_data_display = merged_data_display[(merged_data_display['Date'] >= date_range_pandas[0]) & (merged_data_display['Date'] <= date_range_pandas[1])]
     filtered_data_display = filtered_data_display.sort_values(by='Shares Change % num', ascending=False)
-    styled_df = filtered_data_display[['Ticker', 'Owner Name', 'Date', 'Shares Held', 'Shares Change', 'Shares Change %', 'Individual Holdings Value']].style.applymap(color_percentage, subset=["Shares Change %"])
+    styled_df = filtered_data_display[['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %', 'Individual Holdings Value']].style.map(color_percentage, subset=["Shares Change %"])
     st.dataframe(styled_df)
 
     # 9. Portfolio Analysis for Holders
@@ -468,10 +468,10 @@ elif option == "Análisis Adicional":
 
     # New: Sentiment with % change
     st.subheader("Indicador de Sentimiento a través de Cambios % en Tenencias")
-    holder_sentiment_noinf = holder_sentiment[~np.isinf(holder_sentiment['Shares Change %'])]
+    holder_sentiment_noinf = holder_sentiment[~np.isinf(holder_sentiment['Shares Change % num'])]
     fig_percent = go.Figure()
-    fig_percent.add_trace(go.Scatter(x=holder_sentiment_noinf['Date'], y=holder_sentiment_noinf['Shares Change %'],
+    fig_percent.add_trace(go.Scatter(x=holder_sentiment_noinf['Date'], y=holder_sentiment_noinf['Shares Change % num'],
                                      mode='lines+markers',
-                                     marker=dict(color=['green' if x > 0 else 'red' for x in holder_sentiment_noinf['Shares Change %']])))
+                                     marker=dict(color=['green' if x > 0 else 'red' for x in holder_sentiment_noinf['Shares Change % num']])))
     fig_percent.update_layout(title=f'Sentimiento de {holder} a través de Cambios % en Tenencias', xaxis_title='Fecha', yaxis_title='Cambio en Acciones %')
     st.plotly_chart(fig_percent)
