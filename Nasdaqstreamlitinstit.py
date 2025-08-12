@@ -442,7 +442,10 @@ elif option == "Análisis Adicional":
     filtered_data = merged_data[(merged_data['Date'] >= date_range_pandas[0]) & (merged_data['Date'] <= date_range_pandas[1])]
     filtered_data_display = merged_data_display[(merged_data_display['Date'] >= date_range_pandas[0]) & (merged_data_display['Date'] <= date_range_pandas[1])]
     filtered_data_display = filtered_data_display.sort_values(by='Shares Change % num', ascending=False)
-    styled_df = filtered_data_display[['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %', 'Individual Holdings Value']].style.map(color_percentage, subset=["Shares Change %"])
+
+    num_rows = st.slider("Número de filas a mostrar:", 1, min(1000, len(filtered_data_display)), 100)
+    display_df = filtered_data_display.head(num_rows)
+    styled_df = display_df[['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %', 'Individual Holdings Value']].style.map(color_percentage, subset=["Shares Change %"])
     st.dataframe(styled_df)
 
     # 9. Portfolio Analysis for Holders
@@ -485,3 +488,4 @@ elif option == "Análisis Adicional":
                                      marker=dict(color=['green' if x > 0 else 'red' for x in holder_sentiment_noinf['Shares Change % num']])))
     fig_percent.update_layout(title=f'Sentimiento de {holder} a través de Cambios % en Tenencias', xaxis_title='Fecha', yaxis_title='Cambio en Acciones %')
     st.plotly_chart(fig_percent)
+
