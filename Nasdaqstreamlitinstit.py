@@ -27,6 +27,9 @@ merged_data["Percentage Owned"] = (merged_data["Shares Held"] / (merged_data["To
 merged_data["Individual Holdings Value"] = merged_data["Shares Held"] * merged_data["Price per Share"] / 1e6  # In millions
 merged_data['Date'] = pd.to_datetime(merged_data['Date'])
 
+# New: Calculate change in value (in millions USD)
+merged_data["Change in Value"] = merged_data["Shares Change"] * merged_data["Price per Share"] / 1e6  # In millions USD
+
 # Add percentage change calculation
 merged_data["Previous Shares"] = merged_data["Shares Held"] - merged_data["Shares Change"]
 merged_data["Shares Change %"] = np.where(
@@ -145,6 +148,24 @@ if option == "Análisis de Tenedor Institucional":
         # New plot for shares change %
         st.write("### Cambio en Acciones % por Empresa")
         plot_changes(holder_data, "Ticker", "Shares Change % num", f"Cambio en Acciones % por Empresa de {selected_holder}", is_percentage=True)
+
+        # New: Rank of most valuable holdings
+        st.write("### Rank de Tenencias Más Valiosas (por Valor Total)")
+        holder_val_sorted = holder_data.sort_values(by="Individual Holdings Value", ascending=False).head(20)
+        fig_val = px.bar(holder_val_sorted, x="Ticker", y="Individual Holdings Value", 
+                         title=f"Tenencias Más Valiosas de {selected_holder} (en millones USD)", 
+                         color_discrete_sequence=["blue"])
+        fig_val.update_layout(xaxis_title="Ticker", yaxis_title="Valor Total (millones USD)")
+        st.plotly_chart(fig_val)
+
+        # New: Rank of most valuable changes in positions
+        st.write("### Rank de Cambios en Posiciones Más Valiosos (por USD)")
+        holder_change_sorted = holder_data.sort_values(by="Change in Value", ascending=False).head(20)
+        colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in holder_change_sorted["Change in Value"]]
+        fig_change = go.Figure(data=[go.Bar(x=holder_change_sorted["Ticker"], y=holder_change_sorted["Change in Value"], marker_color=colors)])
+        fig_change.update_layout(title=f"Cambios Más Valiosos en Posiciones de {selected_holder} (en millones USD)", 
+                                 xaxis_title="Ticker", yaxis_title="Cambio en Valor (millones USD)")
+        st.plotly_chart(fig_change)
     else:
         st.write("No hay datos disponibles para el tenedor institucional seleccionado.")
 
@@ -196,6 +217,24 @@ elif option == "Análisis por Ticker":
         # New plot for shares change %
         st.write("### Cambio en Acciones % por Tenedores Institucionales")
         plot_changes(ticker_data, "Owner Name", "Shares Change % num", f"Cambio en Acciones % por Tenedores Institucionales para {selected_ticker}", is_percentage=True)
+
+        # New: Rank of most valuable holdings (by holders for this ticker)
+        st.write("### Rank de Tenencias Más Valiosas (por Valor Total)")
+        ticker_val_sorted = ticker_data.sort_values(by="Individual Holdings Value", ascending=False).head(20)
+        fig_val = px.bar(ticker_val_sorted, x="Owner Name", y="Individual Holdings Value", 
+                         title=f"Tenencias Más Valiosas en {selected_ticker} (en millones USD)", 
+                         color_discrete_sequence=["blue"])
+        fig_val.update_layout(xaxis_title="Tenedor Institucional", yaxis_title="Valor Total (millones USD)")
+        st.plotly_chart(fig_val)
+
+        # New: Rank of most valuable changes in positions (by holders for this ticker)
+        st.write("### Rank de Cambios en Posiciones Más Valiosos (por USD)")
+        ticker_change_sorted = ticker_data.sort_values(by="Change in Value", ascending=False).head(20)
+        colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in ticker_change_sorted["Change in Value"]]
+        fig_change = go.Figure(data=[go.Bar(x=ticker_change_sorted["Owner Name"], y=ticker_change_sorted["Change in Value"], marker_color=colors)])
+        fig_change.update_layout(title=f"Cambios Más Valiosos en Posiciones para {selected_ticker} (en millones USD)", 
+                                 xaxis_title="Tenedor Institucional", yaxis_title="Cambio en Valor (millones USD)")
+        st.plotly_chart(fig_change)
     else:
         st.write("No hay datos disponibles para el ticker seleccionado.")
 
@@ -488,4 +527,3 @@ elif option == "Análisis Adicional":
                                      marker=dict(color=['green' if x > 0 else 'red' for x in holder_sentiment_noinf['Shares Change % num']])))
     fig_percent.update_layout(title=f'Sentimiento de {holder} a través de Cambios % en Tenencias', xaxis_title='Fecha', yaxis_title='Cambio en Acciones %')
     st.plotly_chart(fig_percent)
-
