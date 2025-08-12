@@ -34,6 +34,8 @@ merged_data["Shares Change %"] = np.where(
     (merged_data["Shares Change"] / merged_data["Previous Shares"]) * 100,
     np.inf
 )
+merged_data["Shares Change % num"] = merged_data["Shares Change %"]
+
 # For display purposes, replace inf with 'New Position'
 merged_data_display = merged_data.copy()
 merged_data_display["Shares Change %"] = merged_data_display["Shares Change %"].apply(
@@ -111,6 +113,7 @@ if option == "Análisis de Tenedor Institucional":
 
     holder_data = merged_data[merged_data["Owner Name"] == selected_holder]
     holder_data_display = merged_data_display[merged_data_display["Owner Name"] == selected_holder]
+    holder_data_display = holder_data_display.sort_values(by='Shares Change % num', ascending=False)
 
     if not holder_data.empty:
         st.write(f"### Tenencias de {selected_holder}")
@@ -155,6 +158,7 @@ elif option == "Análisis por Ticker":
 
     ticker_data = merged_data[merged_data["Ticker"] == selected_ticker]
     ticker_data_display = merged_data_display[merged_data_display["Ticker"] == selected_ticker]
+    ticker_data_display = ticker_data_display.sort_values(by='Shares Change % num', ascending=False)
     general_ticker_data = general_data[general_data["Ticker"] == selected_ticker]
 
     if not ticker_data.empty:
@@ -205,6 +209,7 @@ elif option == "Comparación":
         if tickers:
             comparison_data = merged_data[merged_data['Ticker'].isin(tickers)]
             comparison_data_display = merged_data_display[merged_data_display['Ticker'].isin(tickers)]
+            comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
             st.write("### Comparación de Tickers")
             styled_df = comparison_data_display[["Ticker", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.applymap(color_percentage, subset=["Shares Change %"])
             st.dataframe(styled_df)
@@ -234,6 +239,7 @@ elif option == "Comparación":
         if holders:
             comparison_data = merged_data[merged_data['Owner Name'].isin(holders)]
             comparison_data_display = merged_data_display[merged_data_display['Owner Name'].isin(holders)]
+            comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
             st.write("### Comparación de Tenedores Institucionales")
             styled_df = comparison_data_display[["Owner Name", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.applymap(color_percentage, subset=["Shares Change %"])
             st.dataframe(styled_df)
@@ -425,6 +431,7 @@ elif option == "Análisis Adicional":
     date_range_pandas = pd.to_datetime(date_range)
     filtered_data = merged_data[(merged_data['Date'] >= date_range_pandas[0]) & (merged_data['Date'] <= date_range_pandas[1])]
     filtered_data_display = merged_data_display[(merged_data_display['Date'] >= date_range_pandas[0]) & (merged_data_display['Date'] <= date_range_pandas[1])]
+    filtered_data_display = filtered_data_display.sort_values(by='Shares Change % num', ascending=False)
     styled_df = filtered_data_display[['Ticker', 'Owner Name', 'Date', 'Shares Held', 'Shares Change', 'Shares Change %', 'Individual Holdings Value']].style.applymap(color_percentage, subset=["Shares Change %"])
     st.dataframe(styled_df)
 
