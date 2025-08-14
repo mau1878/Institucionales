@@ -8,9 +8,17 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib_venn import venn2, venn3
 
-# Loading and preprocessing data
-institutional_holders = pd.read_csv("institutional_holders.csv")
-general_data = pd.read_csv("general_data.csv")
+# --- Data Loading and Caching ---
+@st.cache_data
+def load_data():
+    institutional_holders = pd.read_csv("institutional_holders.csv")
+    general_data = pd.read_csv("general_data.csv")
+    return institutional_holders, general_data
+
+
+
+# --- Main App Logic ---
+institutional_holders, general_data = load_data()
 
 # Preprocess institutional_holders
 institutional_holders["Shares Held"] = institutional_holders["Shares Held"].str.replace(",", "").astype(float)
@@ -18,25 +26,37 @@ institutional_holders["Shares Change"] = institutional_holders["Shares Change"].
 
 # Preprocess general_data
 general_data["Total Shares Outstanding"] = general_data["Total Shares Outstanding"].str.replace(",", "").astype(float)
-general_data["Total Holdings Value"] = general_data["Total Holdings Value"].str.replace("$", "").str.replace(",",
-                                                                                                             "").astype(
-    float)
-general_data["Institutional Ownership %"] = general_data["Institutional Ownership %"].str.replace("%", "").astype(
-    float) / 100
+general_data["Total Holdings Value"] = general_data["Total Holdings Value"].str.replace("$", "").str.replace(",", "").astype(float)
+general_data["Institutional Ownership %"] = general_data["Institutional Ownership %"].str.replace("%", "").astype(float) / 100
 
 # Calculate approximate price per share (in dollars)
-general_data["Price per Share"] = (general_data["Total Holdings Value"] * 1e6) / (
-            general_data["Total Shares Outstanding"] * 1e6 * general_data["Institutional Ownership %"])
+general_data["Price per Share"] = (general_data["Total Holdings Value"] * 1e6) / (general_data["Total Shares Outstanding"] * 1e6 * general_data["Institutional Ownership %"])
+
+# --- NEW: Calculate Market Cap from existing data ---
+# Avoid division by zero if Institutional Ownership is 0
+general_data['Market Cap'] = np.where(
+    general_data['Institutional Ownership %'] > 0,
+    (general_data['Total Holdings Value'] * 1e6) / general_data['Institutional Ownership %'],
+    0
+)
+
 
 # Merge data
 merged_data = pd.merge(institutional_holders, general_data, on="Ticker")
 merged_data["Percentage Owned"] = (merged_data["Shares Held"] / (merged_data["Total Shares Outstanding"] * 1e6)) * 100
-merged_data["Individual Holdings Value"] = merged_data["Shares Held"] * merged_data[
-    "Price per Share"] / 1e6  # In millions
+merged_data["Individual Holdings Value"] = merged_data["Shares Held"] * merged_data["Price per Share"] / 1e6  # In millions
 merged_data['Date'] = pd.to_datetime(merged_data['Date'])
 
-# New: Calculate change in value (in millions USD)
+# Calculate change in value (in millions USD)
 merged_data["Change in Value"] = merged_data["Shares Change"] * merged_data["Price per Share"] / 1e6  # In millions USD
+
+# --- NEW: Calculate Change as % of Market Cap ---
+# Ensure Market Cap is not zero to avoid division errors
+merged_data['Change as % of Market Cap'] = np.where(
+    merged_data['Market Cap'] > 0,
+    (merged_data['Change in Value'] * 1e6) / merged_data['Market Cap'] * 100,
+    0
+)
 
 # Add percentage change calculation
 merged_data["Previous Shares"] = merged_data["Shares Held"] - merged_data["Shares Change"]
@@ -316,7 +336,7 @@ if option == "Análisis de Tenedor Institucional":
 - **Cambio en Acciones %:** Porcentaje de cambio en las acciones mantenidas (verde para aumentos, rojo para disminuciones).
 """)
 
-    institutional_holders_list = institutional_holders["Owner Name"].unique()
+    institutional_holders_list = sorted(institutional_holders["Owner Name"].unique())
     selected_holder = st.selectbox("Selecciona un Tenedor Institucional:", institutional_holders_list)
 
     holder_data = merged_data[merged_data["Owner Name"] == selected_holder]
@@ -325,9 +345,8 @@ if option == "Análisis de Tenedor Institucional":
 
     if not holder_data.empty:
         st.write(f"### Tenencias de {selected_holder}")
-        styled_df = holder_data_display[
-            ["Date", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
-             "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
+        display_cols = ["Date", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value", "Change as % of Market Cap"]
+        styled_df = holder_data_display[display_cols].style.map(color_percentage, subset=["Shares Change %"]).format({'Change as % of Market Cap': '{:.4f}%'})
         st.dataframe(styled_df)
 
         # Plot for shares held
@@ -384,7 +403,7 @@ elif option == "Análisis por Ticker":
 - **Cambio en Acciones %:** Porcentaje de cambio en las acciones mantenidas (verde para aumentos, rojo para disminuciones).
 """)
 
-    tickers_list = general_data["Ticker"].unique()
+    tickers_list = sorted(general_data["Ticker"].unique())
     selected_ticker = st.selectbox("Selecciona un Ticker:", tickers_list)
 
     ticker_data = merged_data[merged_data["Ticker"] == selected_ticker]
@@ -398,11 +417,12 @@ elif option == "Análisis por Ticker":
             f"Acciones Totales Emitidas: {general_ticker_data['Total Shares Outstanding'].values[0]:,.0f} millones")
         st.write(f"Propiedad Institucional: {general_ticker_data['Institutional Ownership %'].values[0] * 100:.2f}%")
         st.write(f"Valor Total de Tenencias: ${general_ticker_data['Total Holdings Value'].values[0]:,.0f} millones")
+        st.write(f"Capitalización de Mercado (Market Cap): ${general_ticker_data['Market Cap'].values[0] / 1e9:,.2f} mil millones")
+
 
         st.write(f"### Tenedores Institucionales para {selected_ticker}")
-        styled_df = ticker_data_display[
-            ["Date", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
-             "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
+        display_cols = ["Date", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value", "Change as % of Market Cap"]
+        styled_df = ticker_data_display[display_cols].style.map(color_percentage, subset=["Shares Change %"]).format({'Change as % of Market Cap': '{:.4f}%'})
         st.dataframe(styled_df)
 
         # Plot for shares held by institutional holders
@@ -490,9 +510,8 @@ elif option == "Comparación":
             comparison_data_display = merged_data_display[merged_data_display['Ticker'].isin(tickers)]
             comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
             st.write("### Tabla de Comparación de Tickers")
-            styled_df = comparison_data_display[
-                ["Date", "Ticker", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
-                 "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
+            display_cols = ["Date", "Ticker", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value", "Change as % of Market Cap"]
+            styled_df = comparison_data_display[display_cols].style.map(color_percentage, subset=["Shares Change %"]).format({'Change as % of Market Cap': '{:.4f}%'})
             st.dataframe(styled_df)
 
             for metric in ["Shares Held", "Percentage Owned", "Individual Holdings Value"]:
@@ -529,9 +548,8 @@ elif option == "Comparación":
             comparison_data_display = merged_data_display[merged_data_display['Owner Name'].isin(holders)]
             comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
             st.write("### Tabla de Comparación de Tenedores Institucionales")
-            styled_df = comparison_data_display[
-                ["Date", "Owner Name", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
-                 "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
+            display_cols = ["Date", "Owner Name", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value", "Change as % of Market Cap"]
+            styled_df = comparison_data_display[display_cols].style.map(color_percentage, subset=["Shares Change %"]).format({'Change as % of Market Cap': '{:.4f}%'})
             st.dataframe(styled_df)
 
             for metric in ["Shares Held", "Percentage Owned", "Individual Holdings Value"]:
@@ -600,7 +618,8 @@ elif option == "Rankings de Mercado":
     st.write("""
     Esta sección clasifica los tickers según la actividad de compra y venta de los tenedores institucionales.
     - **Términos Absolutos:** Se refiere al número de tenedores que realizaron una acción (abrir, aumentar, disminuir, cerrar posición).
-    - **Términos Relativos:** Se refiere al valor total en USD o al porcentaje total de acciones involucradas en la acción.
+    - **Términos Relativos (Valor):** Se refiere al valor total en USD del movimiento.
+    - **Términos Relativos (% Market Cap):** Mide el valor del movimiento como un porcentaje de la capitalización de mercado total de la empresa, indicando la magnitud del impacto.
     """)
 
     # --- 1. New Positions ---
@@ -625,6 +644,17 @@ elif option == "Rankings de Mercado":
     with st.expander("Ver datos de nuevas posiciones (valor)"):
         st.dataframe(top_new_val)
 
+    # Relative (% Market Cap)
+    st.markdown("#### Por % de Capitalización de Mercado (Relativo - % del Total)")
+    new_mc = new_positions_df.groupby('Ticker')['Change as % of Market Cap'].sum().reset_index(name='% del Market Cap')
+    top_new_mc = new_mc.sort_values('% del Market Cap', ascending=False).head(20)
+    fig_new_mc = px.bar(top_new_mc, x='Ticker', y='% del Market Cap', title="Top 20 Tickers por Impacto de Nuevas Posiciones en Market Cap")
+    fig_new_mc.update_layout(yaxis_ticksuffix="%")
+    st.plotly_chart(fig_new_mc)
+    with st.expander("Ver datos de nuevas posiciones (% market cap)"):
+        st.dataframe(top_new_mc.style.format({'% del Market Cap': '{:.4f}%'}))
+
+
     # --- 2. Increased Positions ---
     st.subheader("📈 Top Tickers por Aumento de Posiciones Existentes")
     increased_positions_df = merged_data[(merged_data['Shares Change'] > 0) & (merged_data['Previous Shares'] > 0)]
@@ -646,6 +676,17 @@ elif option == "Rankings de Mercado":
     st.plotly_chart(fig_inc_val)
     with st.expander("Ver datos de posiciones aumentadas (valor)"):
         st.dataframe(top_inc_val)
+
+    # Relative (% Market Cap)
+    st.markdown("#### Por % de Capitalización de Mercado (Relativo - % del Total)")
+    inc_mc = increased_positions_df.groupby('Ticker')['Change as % of Market Cap'].sum().reset_index(name='% del Market Cap')
+    top_inc_mc = inc_mc.sort_values('% del Market Cap', ascending=False).head(20)
+    fig_inc_mc = px.bar(top_inc_mc, x='Ticker', y='% del Market Cap', title="Top 20 Tickers por Impacto de Aumento de Posiciones en Market Cap")
+    fig_inc_mc.update_layout(yaxis_ticksuffix="%")
+    st.plotly_chart(fig_inc_mc)
+    with st.expander("Ver datos de posiciones aumentadas (% market cap)"):
+        st.dataframe(top_inc_mc.style.format({'% del Market Cap': '{:.4f}%'}))
+
 
     # --- 3. Decreased Positions ---
     st.subheader("📉 Top Tickers por Reducción de Posiciones Existentes")
@@ -669,6 +710,17 @@ elif option == "Rankings de Mercado":
     with st.expander("Ver datos de posiciones reducidas (valor)"):
         st.dataframe(top_dec_val)
 
+    # Relative (% Market Cap)
+    st.markdown("#### Por % de Capitalización de Mercado (Relativo - % del Total)")
+    dec_mc = decreased_positions_df.groupby('Ticker')['Change as % of Market Cap'].sum().reset_index(name='% del Market Cap')
+    top_dec_mc = dec_mc.sort_values('% del Market Cap', ascending=True).head(20)
+    fig_dec_mc = px.bar(top_dec_mc, x='Ticker', y='% del Market Cap', title="Top 20 Tickers por Impacto de Reducción de Posiciones en Market Cap", color_discrete_sequence=['#EF553B'])
+    fig_dec_mc.update_layout(yaxis_ticksuffix="%")
+    st.plotly_chart(fig_dec_mc)
+    with st.expander("Ver datos de posiciones reducidas (% market cap)"):
+        st.dataframe(top_dec_mc.style.format({'% del Market Cap': '{:.4f}%'}))
+
+
     # --- 4. Closed Positions ---
     st.subheader("❌ Top Tickers por Cierre Total de Posiciones")
     closed_positions_df = merged_data[(merged_data['Shares Held'] == 0) & (merged_data['Previous Shares'] > 0)]
@@ -690,6 +742,17 @@ elif option == "Rankings de Mercado":
     st.plotly_chart(fig_closed_val)
     with st.expander("Ver datos de posiciones cerradas (valor)"):
         st.dataframe(top_closed_val)
+
+    # Relative (% Market Cap)
+    st.markdown("#### Por % de Capitalización de Mercado (Relativo - % del Total)")
+    closed_mc = closed_positions_df.groupby('Ticker')['Change as % of Market Cap'].sum().reset_index(name='% del Market Cap')
+    top_closed_mc = closed_mc.sort_values('% del Market Cap', ascending=True).head(20)
+    fig_closed_mc = px.bar(top_closed_mc, x='Ticker', y='% del Market Cap', title="Top 20 Tickers por Impacto de Cierre de Posiciones en Market Cap", color_discrete_sequence=['#d62728'])
+    fig_closed_mc.update_layout(yaxis_ticksuffix="%")
+    st.plotly_chart(fig_closed_mc)
+    with st.expander("Ver datos de posiciones cerradas (% market cap)"):
+        st.dataframe(top_closed_mc.style.format({'% del Market Cap': '{:.4f}%'}))
+
 
 elif option == "Análisis Adicional":
     st.header("Análisis Adicional")
@@ -815,8 +878,8 @@ elif option == "Análisis Adicional":
 
     num_rows = st.slider("Número de filas a mostrar:", 1, min(1000, len(filtered_data_display)), 100)
     display_df = filtered_data_display.head(num_rows)
-    styled_df = display_df[['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %',
-                            'Individual Holdings Value']].style.map(color_percentage, subset=["Shares Change %"])
+    display_cols = ['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %', 'Individual Holdings Value', 'Change as % of Market Cap']
+    styled_df = display_df[display_cols].style.map(color_percentage, subset=["Shares Change %"]).format({'Change as % of Market Cap': '{:.4f}%'})
     st.dataframe(styled_df)
 
     # 9. Portfolio Analysis for Holders
