@@ -108,9 +108,10 @@ def plot_changes(df, x, y_num, title, is_percentage=False):
     st.plotly_chart(fig)
 
 # --- CORRECTED FUNCTION ---
+# --- NEW VENN DIAGRAM FUNCTION ---
 def plot_venn_like_comparison(item_list, comparison_field, data):
     """
-    Generates a Venn-like bubble chart to compare two items for commonalities.
+    Generates a true Venn diagram for two items using shapes and annotations.
     """
     item1_name, item2_name = item_list[0], item_list[1]
 
@@ -131,62 +132,52 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
     unique_to_1 = set1.difference(set2)
     unique_to_2 = set2.difference(set1)
 
-    # Prepare data for plotting
-    plot_data = {
-        'label': [f"Solo en {item1_name}", f"Solo en {item2_name}", "En Común"],
-        'count': [len(unique_to_1), len(unique_to_2), len(common_entities)],
-        'x': [-0.5, 0.5, 0],
-        'y': [0, 0, 0],
-        'entities': [list(unique_to_1), list(unique_to_2), list(common_entities)]
-    }
+    count1 = len(unique_to_1)
+    count2 = len(unique_to_2)
+    count_common = len(common_entities)
 
-    plot_df = pd.DataFrame(plot_data)
-    plot_df = plot_df[plot_df['count'] > 0]
-
-    if plot_df.empty:
-        st.write("No hay datos para mostrar en el gráfico de coincidencias.")
+    if count1 == 0 and count2 == 0 and count_common == 0:
+        st.write("No hay datos de coincidencia para mostrar.")
         return
 
-    # Create the bubble chart
-    fig = px.scatter(plot_df, x='x', y='y', size='count', text='count',
-                     color='label',
-                     color_discrete_map={
-                         f"Solo en {item1_name}": "#FF6B6B",
-                         f"Solo en {item2_name}": "#4ECDC4",
-                         "En Común": "#45B7D1"
-                     },
-                     hover_name='label',
-                     hover_data={'label': False, 'x': False, 'y': False, 'count': True, 'entities': True},
-                     size_max=15,
-                     title=title)
+    # Create a blank figure
+    fig = go.Figure()
 
-    fig.update_traces(
-        textposition='top center',
-        textfont=dict(
-            size=16,
-            color='white'
-        ),
-        marker=dict(
-            sizemin=20,
-            sizemode='diameter',
-            opacity=0.8
-        )
-    )
+    # Define circle properties
+    fig.add_shape(type="circle", xref="x", yref="y", x0=-1, y0=-1, x1=1, y1=1,
+                  fillcolor="#636EFA", opacity=0.7, line_color="#636EFA")
+    fig.add_shape(type="circle", xref="x", yref="y", x0=0, y0=-1, x1=2, y1=1,
+                  fillcolor="#EF553B", opacity=0.7, line_color="#EF553B")
 
+    # Add annotations for counts
+    fig.add_annotation(x=-0.5, y=0, text=f"<b>{count1}</b>", showarrow=False, font=dict(size=24, color="white"))
+    fig.add_annotation(x=1.5, y=0, text=f"<b>{count2}</b>", showarrow=False, font=dict(size=24, color="white"))
+    if count_common > 0:
+        fig.add_annotation(x=0.5, y=0, text=f"<b>{count_common}</b>", showarrow=False, font=dict(size=24, color="white"))
+
+    # Add annotations for labels
+    fig.add_annotation(x=-0.5, y=1.3, text=f"<b>{item1_name}</b>", showarrow=False, font=dict(size=16, color="black"))
+    fig.add_annotation(x=1.5, y=1.3, text=f"<b>{item2_name}</b>", showarrow=False, font=dict(size=16, color="black"))
+
+    # Update layout
     fig.update_layout(
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title='', range=[-1.2, 1.2]),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
+        title_text=title,
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.5, 2.5]),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.8, 1.8]),
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
         height=800,
-        title_font_color="white",
-        paper_bgcolor='rgba(0,0,0,0)'
+        margin=dict(t=80, b=20, l=20, r=20)
     )
-
-    # This is the key fix to prevent stretching and maintain circular shapes
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
     st.plotly_chart(fig, use_container_width=True)
+
+    # Optionally, display the lists of entities in an expander
+    with st.expander("Ver listas de entidades detalladas"):
+        st.write(f"**Solo en {item1_name} ({count1}):** {', '.join(list(unique_to_1)) if unique_to_1 else 'Ninguno'}")
+        st.write(f"**Solo en {item2_name} ({count2}):** {', '.join(list(unique_to_2)) if unique_to_2 else 'Ninguno'}")
+        st.write(f"**En Común ({count_common}):** {', '.join(list(common_entities)) if common_entities else 'Ninguno'}")
 
 
 if option == "Análisis de Tenedor Institucional":
