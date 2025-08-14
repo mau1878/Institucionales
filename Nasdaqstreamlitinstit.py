@@ -284,7 +284,7 @@ def plot_matplotlib_venn(item_list, comparison_field, data):
     # Determine the entity to compare (Holders or Tickers)
     if comparison_field == 'Ticker':
         entity_field = 'Owner Name'
-        title_entities = "Tenedores"
+        title_entities = "Tenedores Institucionales"
     else:
         entity_field = 'Ticker'
         title_entities = "Tickers"
