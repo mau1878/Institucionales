@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import yfinance as yf
 import numpy as np
+import math
 
 # Loading and preprocessing data
 institutional_holders = pd.read_csv("institutional_holders.csv")
@@ -15,16 +16,21 @@ institutional_holders["Shares Change"] = institutional_holders["Shares Change"].
 
 # Preprocess general_data
 general_data["Total Shares Outstanding"] = general_data["Total Shares Outstanding"].str.replace(",", "").astype(float)
-general_data["Total Holdings Value"] = general_data["Total Holdings Value"].str.replace("$", "").str.replace(",", "").astype(float)
-general_data["Institutional Ownership %"] = general_data["Institutional Ownership %"].str.replace("%", "").astype(float) / 100
+general_data["Total Holdings Value"] = general_data["Total Holdings Value"].str.replace("$", "").str.replace(",",
+                                                                                                             "").astype(
+    float)
+general_data["Institutional Ownership %"] = general_data["Institutional Ownership %"].str.replace("%", "").astype(
+    float) / 100
 
 # Calculate approximate price per share (in dollars)
-general_data["Price per Share"] = (general_data["Total Holdings Value"] * 1e6) / (general_data["Total Shares Outstanding"] * 1e6 * general_data["Institutional Ownership %"])
+general_data["Price per Share"] = (general_data["Total Holdings Value"] * 1e6) / (
+            general_data["Total Shares Outstanding"] * 1e6 * general_data["Institutional Ownership %"])
 
 # Merge data
 merged_data = pd.merge(institutional_holders, general_data, on="Ticker")
 merged_data["Percentage Owned"] = (merged_data["Shares Held"] / (merged_data["Total Shares Outstanding"] * 1e6)) * 100
-merged_data["Individual Holdings Value"] = merged_data["Shares Held"] * merged_data["Price per Share"] / 1e6  # In millions
+merged_data["Individual Holdings Value"] = merged_data["Shares Held"] * merged_data[
+    "Price per Share"] / 1e6  # In millions
 merged_data['Date'] = pd.to_datetime(merged_data['Date'])
 
 # New: Calculate change in value (in millions USD)
@@ -45,6 +51,7 @@ merged_data_display["Shares Change %"] = merged_data_display["Shares Change %"].
     lambda x: 'New Position' if np.isinf(x) else f"{x:.2f}%" if not np.isnan(x) else 'N/A'
 )
 
+
 # Function to color percentage changes
 def color_percentage(val):
     if isinstance(val, str):
@@ -63,6 +70,7 @@ def color_percentage(val):
         color = 'green' if val > 0 else 'red' if val < 0 else 'black'
         return f'color: {color}'
 
+
 # Global date filter
 st.sidebar.header("Filtro por Fecha")
 unique_dates = sorted(merged_data['Date'].dt.date.unique())
@@ -78,7 +86,10 @@ st.title("Análisis de Tenencias Institucionales")
 
 # Sidebar for user input
 st.sidebar.header("Entrada del Usuario")
-option = st.sidebar.radio("Elige una opción:", ["Análisis de Tenedor Institucional", "Análisis por Ticker", "Comparación", "Análisis de Coincidencias", "Análisis Adicional"])
+option = st.sidebar.radio("Elige una opción:",
+                          ["Análisis de Tenedor Institucional", "Análisis por Ticker", "Comparación",
+                           "Análisis de Coincidencias", "Análisis Adicional"])
+
 
 def plot_top_20(df, x, y, title, color):
     df = df.sort_values(by=y, ascending=False)
@@ -94,6 +105,7 @@ def plot_top_20(df, x, y, title, color):
     fig.update_layout(xaxis_title=x, yaxis_title=y)
     st.plotly_chart(fig)
 
+
 def plot_changes(df, x, y_num, title, is_percentage=False):
     # Filter out inf for plotting
     plot_df = df[~np.isinf(df[y_num])].copy()
@@ -107,77 +119,153 @@ def plot_changes(df, x, y_num, title, is_percentage=False):
     fig.update_layout(title=title, xaxis_title=x, yaxis_title='Shares Change %' if is_percentage else 'Shares Change')
     st.plotly_chart(fig)
 
-# --- CORRECTED FUNCTION ---
-# --- NEW VENN DIAGRAM FUNCTION ---
+
+# --- UPGRADED VENN DIAGRAM FUNCTION (Proportional and 2/3-way) ---
 def plot_venn_like_comparison(item_list, comparison_field, data):
     """
-    Generates a true Venn diagram for two items using shapes and annotations.
+    Generates a proportional Venn diagram for two or three items.
+    The circle sizes are proportional to the total number of entities in each set.
     """
-    item1_name, item2_name = item_list[0], item_list[1]
-
-    # Determine which fields to use for sets and the chart title
-    if comparison_field == 'Ticker':
-        entity_field = 'Owner Name'
-        title = f"Coincidencia de Tenedores entre {item1_name} y {item2_name}"
-    else:  # comparison_field == 'Owner Name'
-        entity_field = 'Ticker'
-        title = f"Coincidencia de Tickers entre {item1_name} y {item2_name}"
-
-    # Get the sets of entities for each item
-    set1 = set(data[data[comparison_field] == item1_name][entity_field].unique())
-    set2 = set(data[data[comparison_field] == item2_name][entity_field].unique())
-
-    # Calculate intersections
-    common_entities = set1.intersection(set2)
-    unique_to_1 = set1.difference(set2)
-    unique_to_2 = set2.difference(set1)
-
-    count1 = len(unique_to_1)
-    count2 = len(unique_to_2)
-    count_common = len(common_entities)
-
-    if count1 == 0 and count2 == 0 and count_common == 0:
-        st.write("No hay datos de coincidencia para mostrar.")
+    num_items = len(item_list)
+    if not (2 <= num_items <= 3):
+        st.warning("Please select 2 or 3 items for Venn diagram comparison.")
         return
 
-    # Create a blank figure
+    if comparison_field == 'Ticker':
+        entity_field = 'Owner Name'
+        title_entities = "Tenedores"
+    else:
+        entity_field = 'Ticker'
+        title_entities = "Tickers"
+
+    title = f"Coincidencia de {title_entities} entre {', '.join(item_list)}"
+    sets = [set(data[data[comparison_field] == item][entity_field].unique()) for item in item_list]
     fig = go.Figure()
+    opacity = 0.6
+    colors = ["#636EFA", "#EF553B", "#00CC96"]
 
-    # Define circle properties
-    fig.add_shape(type="circle", xref="x", yref="y", x0=-1, y0=-1, x1=1, y1=1,
-                  fillcolor="#636EFA", opacity=0.7, line_color="#636EFA")
-    fig.add_shape(type="circle", xref="x", yref="y", x0=0, y0=-1, x1=2, y1=1,
-                  fillcolor="#EF553B", opacity=0.7, line_color="#EF553B")
+    if num_items == 2:
+        s1, s2 = sets[0], sets[1]
+        n1, n2 = item_list[0], item_list[1]
 
-    # Add annotations for counts
-    fig.add_annotation(x=-0.5, y=0, text=f"<b>{count1}</b>", showarrow=False, font=dict(size=24, color="white"))
-    fig.add_annotation(x=1.5, y=0, text=f"<b>{count2}</b>", showarrow=False, font=dict(size=24, color="white"))
-    if count_common > 0:
-        fig.add_annotation(x=0.5, y=0, text=f"<b>{count_common}</b>", showarrow=False, font=dict(size=24, color="white"))
+        # Calculate segments
+        common = s1.intersection(s2)
+        unique1 = s1.difference(s2)
+        unique2 = s2.difference(s1)
+        c1, c2, c_common = len(unique1), len(unique2), len(common)
 
-    # Add annotations for labels
-    fig.add_annotation(x=-0.5, y=1.3, text=f"<b>{item1_name}</b>", showarrow=False, font=dict(size=16, color="black"))
-    fig.add_annotation(x=1.5, y=1.3, text=f"<b>{item2_name}</b>", showarrow=False, font=dict(size=16, color="black"))
+        if c1 == 0 and c2 == 0 and c_common == 0:
+            st.write("No hay datos de coincidencia para mostrar.")
+            return
 
-    # Update layout
+        # Proportional radius
+        total1, total2 = len(s1), len(s2)
+        max_total = max(total1, total2, 1)
+        r1 = math.sqrt(total1 / max_total)
+        r2 = math.sqrt(total2 / max_total)
+
+        # Position circles
+        x1, y1 = -r1 / 2, 0
+        x2, y2 = r2 / 2, 0
+
+        fig.add_shape(type="circle", xref="x", yref="y", x0=x1 - r1, y0=y1 - r1, x1=x1 + r1, y1=y1 + r1,
+                      fillcolor=colors[0], opacity=opacity, line_color=colors[0])
+        fig.add_shape(type="circle", xref="x", yref="y", x0=x2 - r2, y0=y2 - r2, x1=x2 + r2, y1=y2 + r2,
+                      fillcolor=colors[1], opacity=opacity, line_color=colors[1])
+
+        # Add annotations
+        fig.add_annotation(x=x1, y=y1, text=f"<b>{c1}</b>", showarrow=False, font=dict(size=20, color="white"))
+        fig.add_annotation(x=x2, y=y2, text=f"<b>{c2}</b>", showarrow=False, font=dict(size=20, color="white"))
+        if c_common > 0:
+            fig.add_annotation(x=(x1 + x2) / 2, y=(y1 + y2) / 2, text=f"<b>{c_common}</b>", showarrow=False,
+                               font=dict(size=20, color="white"))
+
+        fig.add_annotation(x=x1, y=y1 + r1 + 0.1, text=f"<b>{n1}</b>", showarrow=False, font=dict(size=14))
+        fig.add_annotation(x=x2, y=y2 + r2 + 0.1, text=f"<b>{n2}</b>", showarrow=False, font=dict(size=14))
+
+        with st.expander("Ver listas de entidades detalladas"):
+            st.write(f"**Solo en {n1} ({c1}):** {', '.join(list(unique1)) if unique1 else 'Ninguno'}")
+            st.write(f"**Solo en {n2} ({c2}):** {', '.join(list(unique2)) if unique2 else 'Ninguno'}")
+            st.write(f"**En Común ({c_common}):** {', '.join(list(common)) if common else 'Ninguno'}")
+
+    elif num_items == 3:
+        s1, s2, s3 = sets[0], sets[1], sets[2]
+        n1, n2, n3 = item_list[0], item_list[1], item_list[2]
+
+        # Calculate segments
+        s1_only = s1 - s2 - s3
+        s2_only = s2 - s1 - s3
+        s3_only = s3 - s1 - s2
+        s1_s2 = (s1 & s2) - s3
+        s1_s3 = (s1 & s3) - s2
+        s2_s3 = (s2 & s3) - s1
+        s1_s2_s3 = s1 & s2 & s3
+
+        counts = {k: len(v) for k, v in locals().items() if k.startswith('s')}
+
+        # Proportional radius
+        total1, total2, total3 = len(s1), len(s2), len(s3)
+        max_total = max(total1, total2, total3, 1)
+        r1 = math.sqrt(total1 / max_total) * 0.8
+        r2 = math.sqrt(total2 / max_total) * 0.8
+        r3 = math.sqrt(total3 / max_total) * 0.8
+
+        # Position circles
+        x1, y1 = 0, r1 * 0.6
+        x2, y2 = -r2 * 0.5, -r2 * 0.3
+        x3, y3 = r3 * 0.5, -r3 * 0.3
+
+        fig.add_shape(type="circle", x0=x1 - r1, y0=y1 - r1, x1=x1 + r1, y1=y1 + r1, fillcolor=colors[0],
+                      opacity=opacity, line_color=colors[0])
+        fig.add_shape(type="circle", x0=x2 - r2, y0=y2 - r2, x1=x2 + r2, y1=y2 + r2, fillcolor=colors[1],
+                      opacity=opacity, line_color=colors[1])
+        fig.add_shape(type="circle", x0=x3 - r3, y0=y3 - r3, x1=x3 + r3, y1=y3 + r3, fillcolor=colors[2],
+                      opacity=opacity, line_color=colors[2])
+
+        # Add annotations (simplified positioning)
+        fig.add_annotation(x=0, y=y1 + r1 / 2, text=f"<b>{counts['s1_only']}</b>", showarrow=False,
+                           font=dict(size=18, color="white"))
+        fig.add_annotation(x=x2, y=y2, text=f"<b>{counts['s2_only']}</b>", showarrow=False,
+                           font=dict(size=18, color="white"))
+        fig.add_annotation(x=x3, y=y3, text=f"<b>{counts['s3_only']}</b>", showarrow=False,
+                           font=dict(size=18, color="white"))
+        fig.add_annotation(x=(x1 + x2) / 2, y=(y1 + y2) / 2, text=f"<b>{counts['s1_s2']}</b>", showarrow=False,
+                           font=dict(size=18, color="white"))
+        fig.add_annotation(x=(x1 + x3) / 2, y=(y1 + y3) / 2, text=f"<b>{counts['s1_s3']}</b>", showarrow=False,
+                           font=dict(size=18, color="white"))
+        fig.add_annotation(x=(x2 + x3) / 2, y=(y2 + y3) / 2, text=f"<b>{counts['s2_s3']}</b>", showarrow=False,
+                           font=dict(size=18, color="white"))
+        fig.add_annotation(x=0, y=0, text=f"<b>{counts['s1_s2_s3']}</b>", showarrow=False,
+                           font=dict(size=18, color="white"))
+
+        fig.add_annotation(x=x1, y=y1 + r1 + 0.1, text=f"<b>{n1}</b>", showarrow=False, font=dict(size=14))
+        fig.add_annotation(x=x2 - r2 - 0.1, y=y2, text=f"<b>{n2}</b>", showarrow=False, font=dict(size=14))
+        fig.add_annotation(x=x3 + r3 + 0.1, y=y3, text=f"<b>{n3}</b>", showarrow=False, font=dict(size=14))
+
+        with st.expander("Ver listas de entidades detalladas"):
+            st.write(f"**Solo en {n1} ({counts['s1_only']}):** {', '.join(list(s1_only)) if s1_only else 'Ninguno'}")
+            st.write(f"**Solo en {n2} ({counts['s2_only']}):** {', '.join(list(s2_only)) if s2_only else 'Ninguno'}")
+            st.write(f"**Solo en {n3} ({counts['s3_only']}):** {', '.join(list(s3_only)) if s3_only else 'Ninguno'}")
+            st.write(
+                f"**Común entre {n1} y {n2} ({counts['s1_s2']}):** {', '.join(list(s1_s2)) if s1_s2 else 'Ninguno'}")
+            st.write(
+                f"**Común entre {n1} y {n3} ({counts['s1_s3']}):** {', '.join(list(s1_s3)) if s1_s3 else 'Ninguno'}")
+            st.write(
+                f"**Común entre {n2} y {n3} ({counts['s2_s3']}):** {', '.join(list(s2_s3)) if s2_s3 else 'Ninguno'}")
+            st.write(
+                f"**Común entre los tres ({counts['s1_s2_s3']}):** {', '.join(list(s1_s2_s3)) if s1_s2_s3 else 'Ninguno'}")
+
     fig.update_layout(
         title_text=title,
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.5, 2.5]),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.8, 1.8]),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-2, 2]),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.5, 2]),
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
-        height=800,
+        height=500,
         margin=dict(t=80, b=20, l=20, r=20)
     )
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
-
     st.plotly_chart(fig, use_container_width=True)
-
-    # Optionally, display the lists of entities in an expander
-    with st.expander("Ver listas de entidades detalladas"):
-        st.write(f"**Solo en {item1_name} ({count1}):** {', '.join(list(unique_to_1)) if unique_to_1 else 'Ninguno'}")
-        st.write(f"**Solo en {item2_name} ({count2}):** {', '.join(list(unique_to_2)) if unique_to_2 else 'Ninguno'}")
-        st.write(f"**En Común ({count_common}):** {', '.join(list(common_entities)) if common_entities else 'Ninguno'}")
 
 
 if option == "Análisis de Tenedor Institucional":
@@ -201,16 +289,20 @@ if option == "Análisis de Tenedor Institucional":
 
     if not holder_data.empty:
         st.write(f"### Tenencias de {selected_holder}")
-        styled_df = holder_data_display[["Date", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
+        styled_df = holder_data_display[
+            ["Date", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
+             "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
         st.dataframe(styled_df)
 
         # Plot for shares held
         st.write("### Acciones Mantenidas por Empresa")
-        plot_top_20(holder_data, "Ticker", "Shares Held", f"Acciones Mantenidas por Empresa de {selected_holder}", "skyblue")
+        plot_top_20(holder_data, "Ticker", "Shares Held", f"Acciones Mantenidas por Empresa de {selected_holder}",
+                    "skyblue")
 
         # Plot for percentage owned
         st.write("### Porcentaje de Acciones Propiedad por Empresa")
-        plot_top_20(holder_data, "Ticker", "Percentage Owned", f"Porcentaje de Acciones Propiedad por Empresa de {selected_holder}", "lightgreen")
+        plot_top_20(holder_data, "Ticker", "Percentage Owned",
+                    f"Porcentaje de Acciones Propiedad por Empresa de {selected_holder}", "lightgreen")
 
         # New plot for shares change
         st.write("### Cambio en Acciones por Empresa")
@@ -218,7 +310,8 @@ if option == "Análisis de Tenedor Institucional":
 
         # New plot for shares change %
         st.write("### Cambio en Acciones % por Empresa")
-        plot_changes(holder_data, "Ticker", "Shares Change % num", f"Cambio en Acciones % por Empresa de {selected_holder}", is_percentage=True)
+        plot_changes(holder_data, "Ticker", "Shares Change % num",
+                     f"Cambio en Acciones % por Empresa de {selected_holder}", is_percentage=True)
 
         # New: Rank of most valuable holdings
         st.write("### Rank de Tenencias Más Valiosas (por Valor Total)")
@@ -232,8 +325,10 @@ if option == "Análisis de Tenedor Institucional":
         # New: Rank of most valuable changes in positions
         st.write("### Rank de Cambios en Posiciones Más Valiosos (por USD)")
         holder_change_sorted = holder_data.sort_values(by="Change in Value", ascending=False).head(20)
-        colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in holder_change_sorted["Change in Value"]]
-        fig_change = go.Figure(data=[go.Bar(x=holder_change_sorted["Ticker"], y=holder_change_sorted["Change in Value"], marker_color=colors)])
+        colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in
+                  holder_change_sorted["Change in Value"]]
+        fig_change = go.Figure(data=[
+            go.Bar(x=holder_change_sorted["Ticker"], y=holder_change_sorted["Change in Value"], marker_color=colors)])
         fig_change.update_layout(title=f"Cambios Más Valiosos en Posiciones de {selected_holder} (en millones USD)",
                                  xaxis_title="Ticker", yaxis_title="Cambio en Valor (millones USD)")
         st.plotly_chart(fig_change)
@@ -263,29 +358,36 @@ elif option == "Análisis por Ticker":
 
     if not ticker_data.empty:
         st.write(f"### Datos Generales para {selected_ticker}")
-        st.write(f"Acciones Totales Emitidas: {general_ticker_data['Total Shares Outstanding'].values[0]:,.0f} millones")
+        st.write(
+            f"Acciones Totales Emitidas: {general_ticker_data['Total Shares Outstanding'].values[0]:,.0f} millones")
         st.write(f"Propiedad Institucional: {general_ticker_data['Institutional Ownership %'].values[0] * 100:.2f}%")
         st.write(f"Valor Total de Tenencias: ${general_ticker_data['Total Holdings Value'].values[0]:,.0f} millones")
 
         st.write(f"### Tenedores Institucionales para {selected_ticker}")
-        styled_df = ticker_data_display[["Date", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
+        styled_df = ticker_data_display[
+            ["Date", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
+             "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
         st.dataframe(styled_df)
 
         # Plot for shares held by institutional holders
         st.write("### Acciones Mantenidas por Tenedores Institucionales")
-        plot_top_20(ticker_data, "Owner Name", "Shares Held", f"Acciones Mantenidas por Tenedores Institucionales para {selected_ticker}", "orange")
+        plot_top_20(ticker_data, "Owner Name", "Shares Held",
+                    f"Acciones Mantenidas por Tenedores Institucionales para {selected_ticker}", "orange")
 
         # Plot for percentage owned by institutional holders
         st.write("### Porcentaje de Acciones Propiedad por Tenedores Institucionales")
-        plot_top_20(ticker_data, "Owner Name", "Percentage Owned", f"Porcentaje de Acciones Propiedad por Tenedores Institucionales para {selected_ticker}", "purple")
+        plot_top_20(ticker_data, "Owner Name", "Percentage Owned",
+                    f"Porcentaje de Acciones Propiedad por Tenedores Institucionales para {selected_ticker}", "purple")
 
         # New plot for shares change
         st.write("### Cambio en Acciones por Tenedores Institucionales")
-        plot_changes(ticker_data, "Owner Name", "Shares Change", f"Cambio en Acciones por Tenedores Institucionales para {selected_ticker}")
+        plot_changes(ticker_data, "Owner Name", "Shares Change",
+                     f"Cambio en Acciones por Tenedores Institucionales para {selected_ticker}")
 
         # New plot for shares change %
         st.write("### Cambio en Acciones % por Tenedores Institucionales")
-        plot_changes(ticker_data, "Owner Name", "Shares Change % num", f"Cambio en Acciones % por Tenedores Institucionales para {selected_ticker}", is_percentage=True)
+        plot_changes(ticker_data, "Owner Name", "Shares Change % num",
+                     f"Cambio en Acciones % por Tenedores Institucionales para {selected_ticker}", is_percentage=True)
 
         # New: Rank of most valuable holdings (by holders for this ticker)
         st.write("### Rank de Tenencias Más Valiosas (por Valor Total)")
@@ -299,8 +401,11 @@ elif option == "Análisis por Ticker":
         # New: Rank of most valuable changes in positions (by holders for this ticker)
         st.write("### Rank de Cambios en Posiciones Más Valiosos (por USD)")
         ticker_change_sorted = ticker_data.sort_values(by="Change in Value", ascending=False).head(20)
-        colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in ticker_change_sorted["Change in Value"]]
-        fig_change = go.Figure(data=[go.Bar(x=ticker_change_sorted["Owner Name"], y=ticker_change_sorted["Change in Value"], marker_color=colors)])
+        colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in
+                  ticker_change_sorted["Change in Value"]]
+        fig_change = go.Figure(data=[
+            go.Bar(x=ticker_change_sorted["Owner Name"], y=ticker_change_sorted["Change in Value"],
+                   marker_color=colors)])
         fig_change.update_layout(title=f"Cambios Más Valiosos en Posiciones para {selected_ticker} (en millones USD)",
                                  xaxis_title="Tenedor Institucional", yaxis_title="Cambio en Valor (millones USD)")
         st.plotly_chart(fig_change)
@@ -314,7 +419,7 @@ elif option == "Comparación":
     **Cómo usar esta sección:**
     - **Elige el tipo de comparación:** Puedes comparar tickers o tenedores institucionales.
     - **Selecciona múltiples items:** Elige varios tickers o tenedores para comparar sus datos.
-    - **Gráfico de Coincidencias:** Si seleccionas exactamente dos ítems, aparecerá un gráfico de burbujas mostrando sus tenencias o tickers en común.
+    - **Gráfico de Coincidencias:** Si seleccionas dos o tres ítems, aparecerá un diagrama de Venn mostrando sus tenencias o tickers en común.
     """)
 
     comparison_type = st.radio("Elige el tipo de comparación:", ["Tickers", "Tenedores Institucionales"])
@@ -322,17 +427,20 @@ elif option == "Comparación":
     if comparison_type == "Tickers":
         tickers = st.multiselect("Selecciona los Tickers para comparar:", sorted(general_data["Ticker"].unique()))
         if tickers:
-            # New Venn-like plot for two tickers
-            if len(tickers) == 2:
+            # Venn plot for two or three tickers
+            if len(tickers) in [2, 3]:
                 st.subheader("Gráfico de Coincidencias de Tenedores")
-                st.write("Este gráfico muestra los tenedores institucionales únicos para cada ticker y los que tienen en común. El tamaño de la burbuja indica el número de tenedores en cada categoría.")
+                st.write(
+                    "Este diagrama de Venn muestra los tenedores institucionales únicos para cada ticker y las coincidencias entre ellos.")
                 plot_venn_like_comparison(tickers, 'Ticker', merged_data)
 
             comparison_data = merged_data[merged_data['Ticker'].isin(tickers)]
             comparison_data_display = merged_data_display[merged_data_display['Ticker'].isin(tickers)]
             comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
             st.write("### Comparación de Tickers")
-            styled_df = comparison_data_display[["Date", "Ticker", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
+            styled_df = comparison_data_display[
+                ["Date", "Ticker", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
+                 "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
             st.dataframe(styled_df)
 
             # Plotting
@@ -342,25 +450,30 @@ elif option == "Comparación":
                 st.plotly_chart(fig)
 
     elif comparison_type == "Tenedores Institucionales":
-        holders = st.multiselect("Selecciona los Tenedores Institucionales para comparar:", sorted(institutional_holders["Owner Name"].unique()))
+        holders = st.multiselect("Selecciona los Tenedores Institucionales para comparar:",
+                                 sorted(institutional_holders["Owner Name"].unique()))
         if holders:
-            # New Venn-like plot for two holders
-            if len(holders) == 2:
+            # Venn plot for two or three holders
+            if len(holders) in [2, 3]:
                 st.subheader("Gráfico de Coincidencias de Tickers")
-                st.write("Este gráfico muestra los tickers únicos en la cartera de cada tenedor y los que tienen en común. El tamaño de la burbuja indica el número de tickers en cada categoría.")
+                st.write(
+                    "Este diagrama de Venn muestra los tickers únicos en la cartera de cada tenedor y las coincidencias entre ellos.")
                 plot_venn_like_comparison(holders, 'Owner Name', merged_data)
 
             comparison_data = merged_data[merged_data['Owner Name'].isin(holders)]
             comparison_data_display = merged_data_display[merged_data_display['Owner Name'].isin(holders)]
             comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
             st.write("### Comparación de Tenedores Institucionales")
-            styled_df = comparison_data_display[["Date", "Owner Name", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned", "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
+            styled_df = comparison_data_display[
+                ["Date", "Owner Name", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
+                 "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
             st.dataframe(styled_df)
 
             # Plotting
             for metric in ["Shares Held", "Percentage Owned", "Individual Holdings Value"]:
                 fig = px.bar(comparison_data, x="Owner Name", y=metric, color="Ticker", barmode="group")
-                fig.update_layout(title=f"Comparación de {metric} por Tenedor Institucional", xaxis_title="Tenedor Institucional", yaxis_title=metric)
+                fig.update_layout(title=f"Comparación de {metric} por Tenedor Institucional",
+                                  xaxis_title="Tenedor Institucional", yaxis_title=metric)
                 st.plotly_chart(fig)
 
 elif option == "Análisis de Coincidencias":
@@ -380,19 +493,25 @@ elif option == "Análisis de Coincidencias":
     # User-defined threshold
     threshold = st.slider("Selecciona el umbral de coincidencia en porcentaje:", 0, 100, 50)
 
+
     # Function to calculate commonality
     def commonality(data, group_by, common_entity):
-        counts = data.groupby(group_by)['Ticker'].nunique() if common_entity == 'Ticker' else data.groupby(group_by)['Owner Name'].nunique()
+        counts = data.groupby(group_by)['Ticker'].nunique() if common_entity == 'Ticker' else data.groupby(group_by)[
+            'Owner Name'].nunique()
         total = len(data[common_entity].unique())
         return ((counts / total) * 100).reset_index(name='Percentage')
+
 
     # Institutional Holders with most common tickers
     st.subheader("Tenedores Institucionales con más Tickers en Común")
     holder_commonality = commonality(merged_data, 'Owner Name', 'Ticker')
-    filtered_holders = holder_commonality[holder_commonality['Percentage'] >= threshold].sort_values('Percentage', ascending=False)
+    filtered_holders = holder_commonality[holder_commonality['Percentage'] >= threshold].sort_values('Percentage',
+                                                                                                     ascending=False)
     if not filtered_holders.empty:
         st.dataframe(filtered_holders)
-        fig = px.bar(filtered_holders, x='Owner Name', y='Percentage', title=f"Tenedores Institucionales con más de {threshold}% de Tickers en Común", labels={'Percentage': f'Porcentaje de Tickers Comunes'})
+        fig = px.bar(filtered_holders, x='Owner Name', y='Percentage',
+                     title=f"Tenedores Institucionales con más de {threshold}% de Tickers en Común",
+                     labels={'Percentage': f'Porcentaje de Tickers Comunes'})
         st.plotly_chart(fig)
     else:
         st.write(f"No hay tenedores institucionales con más de {threshold}% de tickers en común.")
@@ -400,10 +519,13 @@ elif option == "Análisis de Coincidencias":
     # Tickers with most common institutional holders
     st.subheader("Tickers con más Tenedores Institucionales en Común")
     ticker_commonality = commonality(merged_data, 'Ticker', 'Owner Name')
-    filtered_tickers = ticker_commonality[ticker_commonality['Percentage'] >= threshold].sort_values('Percentage', ascending=False)
+    filtered_tickers = ticker_commonality[ticker_commonality['Percentage'] >= threshold].sort_values('Percentage',
+                                                                                                     ascending=False)
     if not filtered_tickers.empty:
         st.dataframe(filtered_tickers)
-        fig = px.bar(filtered_tickers, x='Ticker', y='Percentage', title=f"Tickers con más de {threshold}% de Tenedores Institucionales en Común", labels={'Percentage': f'Porcentaje de Tenedores Comunes'})
+        fig = px.bar(filtered_tickers, x='Ticker', y='Percentage',
+                     title=f"Tickers con más de {threshold}% de Tenedores Institucionales en Común",
+                     labels={'Percentage': f'Porcentaje de Tenedores Comunes'})
         st.plotly_chart(fig)
     else:
         st.write(f"No hay tickers con más de {threshold}% de tenedores institucionales en común.")
@@ -428,7 +550,8 @@ elif option == "Análisis Adicional":
             st.write(f"Capitalización de Mercado de {ticker}: ${market_cap / 1e6:.2f} millones")
         except Exception as e:
             st.warning(f"No se pudo obtener el precio actual para {ticker} desde yfinance. Error: {e}")
-            st.info(f"Usando precio aproximado de los datos cargados: ${general_data[general_data['Ticker'] == ticker]['Price per Share'].iloc[0]:.2f}")
+            st.info(
+                f"Usando precio aproximado de los datos cargados: ${general_data[general_data['Ticker'] == ticker]['Price per Share'].iloc[0]:.2f}")
             price = general_data[general_data['Ticker'] == ticker]['Price per Share'].iloc[0]
             market_cap = price * total_shares
             st.write(f"Capitalización de Mercado Aproximada de {ticker}: ${market_cap / 1e6:.2f} millones")
@@ -455,14 +578,18 @@ elif option == "Análisis Adicional":
         other_holders_percentage = (other_holders_shares / total_shares) * 100
 
         # Prepare data for pie chart
-        pie_data = top_holders[['Owner Name', 'Ownership Percentage']].rename(columns={'Ownership Percentage': 'Percentage'})
+        pie_data = top_holders[['Owner Name', 'Ownership Percentage']].rename(
+            columns={'Ownership Percentage': 'Percentage'})
         pie_data = pd.concat([pie_data,
-                              pd.DataFrame({'Owner Name': ['Otros institucionales'], 'Percentage': [other_institutional_percentage]}),
-                              pd.DataFrame({'Owner Name': ['Otros tenedores'], 'Percentage': [other_holders_percentage]})],
+                              pd.DataFrame({'Owner Name': ['Otros institucionales'],
+                                            'Percentage': [other_institutional_percentage]}),
+                              pd.DataFrame(
+                                  {'Owner Name': ['Otros tenedores'], 'Percentage': [other_holders_percentage]})],
                              ignore_index=True)
 
         # Create pie chart
-        fig = px.pie(pie_data, values='Percentage', names='Owner Name', title=f'Concentración de Propiedad para {ticker_conc}')
+        fig = px.pie(pie_data, values='Percentage', names='Owner Name',
+                     title=f'Concentración de Propiedad para {ticker_conc}')
         st.plotly_chart(fig)
 
     # 4. Comparative Analysis Across Tickers
@@ -492,7 +619,8 @@ elif option == "Análisis Adicional":
             simplified_data = pd.concat([simplified_data, top_holders], ignore_index=True)
 
         # Sort 'Otros institucionales' to the bottom
-        category_order = [name for name in simplified_data['Owner Name'].unique() if name != 'Otros institucionales'] + ['Otros institucionales']
+        category_order = [name for name in simplified_data['Owner Name'].unique() if
+                          name != 'Otros institucionales'] + ['Otros institucionales']
 
         st.write("### Comparación de Métricas por Ticker")
         for metric in ["Shares Held", "Percentage Owned", "Individual Holdings Value"]:
@@ -518,13 +646,16 @@ elif option == "Análisis Adicional":
                            value=(min_date, max_date))
 
     date_range_pandas = pd.to_datetime(date_range)
-    filtered_data = merged_data[(merged_data['Date'] >= date_range_pandas[0]) & (merged_data['Date'] <= date_range_pandas[1])]
-    filtered_data_display = merged_data_display[(merged_data_display['Date'] >= date_range_pandas[0]) & (merged_data_display['Date'] <= date_range_pandas[1])]
+    filtered_data = merged_data[
+        (merged_data['Date'] >= date_range_pandas[0]) & (merged_data['Date'] <= date_range_pandas[1])]
+    filtered_data_display = merged_data_display[
+        (merged_data_display['Date'] >= date_range_pandas[0]) & (merged_data_display['Date'] <= date_range_pandas[1])]
     filtered_data_display = filtered_data_display.sort_values(by='Shares Change % num', ascending=False)
 
     num_rows = st.slider("Número de filas a mostrar:", 1, min(1000, len(filtered_data_display)), 100)
     display_df = filtered_data_display.head(num_rows)
-    styled_df = display_df[['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %', 'Individual Holdings Value']].style.map(color_percentage, subset=["Shares Change %"])
+    styled_df = display_df[['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %',
+                            'Individual Holdings Value']].style.map(color_percentage, subset=["Shares Change %"])
     st.dataframe(styled_df)
 
     # 9. Portfolio Analysis for Holders
@@ -554,16 +685,21 @@ elif option == "Análisis Adicional":
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=holder_sentiment['Date'], y=holder_sentiment['Shares Change'],
                                  mode='lines+markers',
-                                 marker=dict(color=['green' if x > 0 else 'red' for x in holder_sentiment['Shares Change']])))
-        fig.update_layout(title=f'Sentimiento de {holder} a través de Cambios en Tenencias', xaxis_title='Fecha', yaxis_title='Cambio en Acciones')
+                                 marker=dict(
+                                     color=['green' if x > 0 else 'red' for x in holder_sentiment['Shares Change']])))
+        fig.update_layout(title=f'Sentimiento de {holder} a través de Cambios en Tenencias', xaxis_title='Fecha',
+                          yaxis_title='Cambio en Acciones')
         st.plotly_chart(fig)
 
         # New: Sentiment with % change
         st.subheader("Indicador de Sentimiento a través de Cambios % en Tenencias")
         holder_sentiment_noinf = holder_sentiment[~np.isinf(holder_sentiment['Shares Change % num'])]
         fig_percent = go.Figure()
-        fig_percent.add_trace(go.Scatter(x=holder_sentiment_noinf['Date'], y=holder_sentiment_noinf['Shares Change % num'],
-                                         mode='lines+markers',
-                                         marker=dict(color=['green' if x > 0 else 'red' for x in holder_sentiment_noinf['Shares Change % num']])))
-        fig_percent.update_layout(title=f'Sentimiento de {holder} a través de Cambios % en Tenencias', xaxis_title='Fecha', yaxis_title='Cambio en Acciones %')
+        fig_percent.add_trace(
+            go.Scatter(x=holder_sentiment_noinf['Date'], y=holder_sentiment_noinf['Shares Change % num'],
+                       mode='lines+markers',
+                       marker=dict(
+                           color=['green' if x > 0 else 'red' for x in holder_sentiment_noinf['Shares Change % num']])))
+        fig_percent.update_layout(title=f'Sentimiento de {holder} a través de Cambios % en Tenencias',
+                                  xaxis_title='Fecha', yaxis_title='Cambio en Acciones %')
         st.plotly_chart(fig_percent)
