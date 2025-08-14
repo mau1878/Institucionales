@@ -151,20 +151,23 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
     fig = px.scatter(plot_df, x='x', y='y', size='count', text='count',
                      color='label',
                      color_discrete_map={
-                         f"Solo en {item1_name}": "#636EFA",
-                         f"Solo en {item2_name}": "#EF553B",
-                         "En Común": "#00CC96"
+                         f"Solo en {item1_name}": "#FF6B6B",
+                         f"Solo en {item2_name}": "#4ECDC4",
+                         "En Común": "#45B7D1"
                      },
                      hover_name='label',
                      hover_data={'label': False, 'x': False, 'y': False, 'count': True, 'entities': True},
-                     size_max=120,
+                     size_max=60,
                      title=title)
 
     fig.update_traces(
         textposition='top center',
-        textfont_size=16,
+        textfont=dict(
+            size=16,
+            color='white'
+        ),
         marker=dict(
-            sizemin=30,
+            sizemin=20,
             sizemode='diameter',
             opacity=0.8
         )
@@ -175,15 +178,15 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
-        width=500,
-        height=500,
-        autosize=False
+        height=400,
+        title_font_color="white",
+        paper_bgcolor='rgba(0,0,0,0)'
     )
 
     # This is the key fix to prevent stretching and maintain circular shapes
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
 
 if option == "Análisis de Tenedor Institucional":
