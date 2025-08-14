@@ -15,7 +15,24 @@ def load_data():
     general_data = pd.read_csv("general_data.csv")
     return institutional_holders, general_data
 
-
+@st.cache_data
+def get_market_caps(tickers_list):
+    """
+    Fetches current market capitalization for a list of tickers using yfinance.
+    Includes error handling for tickers that might fail.
+    """
+    market_caps = {}
+    for ticker in tickers_list:
+        try:
+            stock = yf.Ticker(ticker)
+            # Use 'marketCap' as it's the most common key for market capitalization
+            cap = stock.info.get('marketCap', None)
+            if cap:
+                market_caps[ticker] = cap
+        except Exception:
+            # Silently fail for tickers that can't be found
+            pass
+    return market_caps
 
 # --- Main App Logic ---
 institutional_holders, general_data = load_data()
@@ -32,13 +49,21 @@ general_data["Institutional Ownership %"] = general_data["Institutional Ownershi
 # Calculate approximate price per share (in dollars)
 general_data["Price per Share"] = (general_data["Total Holdings Value"] * 1e6) / (general_data["Total Shares Outstanding"] * 1e6 * general_data["Institutional Ownership %"])
 
-# --- NEW: Calculate Market Cap from existing data ---
-# Avoid division by zero if Institutional Ownership is 0
-general_data['Market Cap'] = np.where(
-    general_data['Institutional Ownership %'] > 0,
-    (general_data['Total Holdings Value'] * 1e6) / general_data['Institutional Ownership %'],
-    0
-)
+# --- NEW: Fetch and Merge Live Market Cap Data ---
+with st.spinner('Obteniendo datos de capitalización de mercado en tiempo real...'):
+    unique_tickers = general_data['Ticker'].unique()
+    live_market_caps = get_market_caps(unique_tickers)
+
+    if live_market_caps:
+        market_cap_df = pd.DataFrame(list(live_market_caps.items()), columns=['Ticker', 'Market Cap'])
+        general_data = pd.merge(general_data, market_cap_df, on='Ticker', how='left')
+        st.success('Datos de capitalización de mercado obtenidos con éxito.')
+    else:
+        st.warning('No se pudieron obtener los datos de capitalización de mercado en tiempo real. Se usarán valores aproximados.')
+
+# Use approximate market cap as a fallback
+general_data['Market Cap'] = general_data.get('Market Cap', general_data['Price per Share'] * general_data['Total Shares Outstanding'] * 1e6)
+general_data['Market Cap'].fillna(general_data['Price per Share'] * general_data['Total Shares Outstanding'] * 1e6, inplace=True)
 
 
 # Merge data
@@ -753,6 +778,94 @@ elif option == "Rankings de Mercado":
     with st.expander("Ver datos de posiciones cerradas (% market cap)"):
         st.dataframe(top_closed_mc.style.format({'% del Market Cap': '{:.4f}%'}))
 
+
+
+    # --- 5. Cumulative Positive Flow (Buying Pressure) ---
+    st.subheader("🟩 Flujo Acumulado Positivo (Presión de Compra)")
+    positive_flow_df = merged_data[merged_data['Shares Change'] > 0]
+
+    # By Value
+    st.markdown("#### Por Valor Total (USD)")
+    pos_flow_val = positive_flow_df.groupby('Ticker')['Change in Value'].sum().reset_index(name='Valor Total de Compra (Millones USD)')
+    top_pos_flow_val = pos_flow_val.sort_values('Valor Total de Compra (Millones USD)', ascending=False).head(20)
+    fig_pos_flow_val = px.bar(top_pos_flow_val, x='Ticker', y='Valor Total de Compra (Millones USD)', title="Top 20 Tickers por Presión de Compra (Valor)")
+    st.plotly_chart(fig_pos_flow_val)
+    with st.expander("Ver datos de presión de compra (valor)"):
+        st.dataframe(top_pos_flow_val)
+
+    # By % of Market Cap
+    st.markdown("#### Por % de Capitalización de Mercado")
+    pos_flow_mc = positive_flow_df.groupby('Ticker')['Change as % of Market Cap'].sum().reset_index(name='% del Market Cap')
+    top_pos_flow_mc = pos_flow_mc.sort_values('% del Market Cap', ascending=False).head(20)
+    fig_pos_flow_mc = px.bar(top_pos_flow_mc, x='Ticker', y='% del Market Cap', title="Top 20 Tickers por Presión de Compra (% Market Cap)")
+    fig_pos_flow_mc.update_layout(yaxis_ticksuffix="%")
+    st.plotly_chart(fig_pos_flow_mc)
+    with st.expander("Ver datos de presión de compra (% market cap)"):
+        st.dataframe(top_pos_flow_mc.style.format({'% del Market Cap': '{:.4f}%'}))
+
+
+    # --- 6. Cumulative Negative Flow (Selling Pressure) ---
+    st.subheader("🟥 Flujo Acumulado Negativo (Presión de Venta)")
+    negative_flow_df = merged_data[merged_data['Shares Change'] < 0]
+
+    # By Value
+    st.markdown("#### Por Valor Total (USD)")
+    neg_flow_val = negative_flow_df.groupby('Ticker')['Change in Value'].sum().reset_index(name='Valor Total de Venta (Millones USD)')
+    top_neg_flow_val = neg_flow_val.sort_values('Valor Total de Venta (Millones USD)', ascending=True).head(20)
+    fig_neg_flow_val = px.bar(top_neg_flow_val, x='Ticker', y='Valor Total de Venta (Millones USD)', title="Top 20 Tickers por Presión de Venta (Valor)", color_discrete_sequence=['#EF553B'])
+    st.plotly_chart(fig_neg_flow_val)
+    with st.expander("Ver datos de presión de venta (valor)"):
+        st.dataframe(top_neg_flow_val)
+
+    # By % of Market Cap
+    st.markdown("#### Por % de Capitalización de Mercado")
+    neg_flow_mc = negative_flow_df.groupby('Ticker')['Change as % of Market Cap'].sum().reset_index(name='% del Market Cap')
+    top_neg_flow_mc = neg_flow_mc.sort_values('% del Market Cap', ascending=True).head(20)
+    fig_neg_flow_mc = px.bar(top_neg_flow_mc, x='Ticker', y='% del Market Cap', title="Top 20 Tickers por Presión de Venta (% Market Cap)", color_discrete_sequence=['#EF553B'])
+    fig_neg_flow_mc.update_layout(yaxis_ticksuffix="%")
+    st.plotly_chart(fig_neg_flow_mc)
+    with st.expander("Ver datos de presión de venta (% market cap)"):
+        st.dataframe(top_neg_flow_mc.style.format({'% del Market Cap': '{:.4f}%'}))
+
+
+    # --- 7. Net Institutional Flow ---
+    st.subheader("📊 Flujo Neto Institucional (Compra Neta vs. Venta Neta)")
+    net_flow_df = merged_data.groupby('Ticker').agg(
+        Net_Change_Value=('Change in Value', 'sum'),
+        Net_Change_MC=('Change as % of Market Cap', 'sum')
+    ).reset_index()
+
+    # Top by Positive Net Flow
+    st.markdown("#### Top Tickers por Flujo Neto Positivo (Mayor Entrada de Capital)")
+    top_net_positive = net_flow_df.sort_values('Net_Change_Value', ascending=False).head(20)
+    fig_net_pos_val = px.bar(top_net_positive, x='Ticker', y='Net_Change_Value', title="Top 20 Tickers por Flujo Neto Positivo (Valor)", color_discrete_sequence=['#00CC96'])
+    fig_net_pos_val.update_layout(yaxis_title="Flujo Neto (Millones USD)")
+    st.plotly_chart(fig_net_pos_val)
+    with st.expander("Ver datos de flujo neto positivo (valor)"):
+        st.dataframe(top_net_positive)
+
+    top_net_positive_mc = net_flow_df.sort_values('Net_Change_MC', ascending=False).head(20)
+    fig_net_pos_mc = px.bar(top_net_positive_mc, x='Ticker', y='Net_Change_MC', title="Top 20 Tickers por Flujo Neto Positivo (% Market Cap)", color_discrete_sequence=['#00CC96'])
+    fig_net_pos_mc.update_layout(yaxis_title="Flujo Neto (% Market Cap)", yaxis_ticksuffix="%")
+    st.plotly_chart(fig_net_pos_mc)
+    with st.expander("Ver datos de flujo neto positivo (% market cap)"):
+        st.dataframe(top_net_positive_mc.style.format({'Net_Change_MC': '{:.4f}%'}))
+
+    # Top by Negative Net Flow
+    st.markdown("#### Top Tickers por Flujo Neto Negativo (Mayor Salida de Capital)")
+    top_net_negative = net_flow_df.sort_values('Net_Change_Value', ascending=True).head(20)
+    fig_net_neg_val = px.bar(top_net_negative, x='Ticker', y='Net_Change_Value', title="Top 20 Tickers por Flujo Neto Negativo (Valor)", color_discrete_sequence=['#d62728'])
+    fig_net_neg_val.update_layout(yaxis_title="Flujo Neto (Millones USD)")
+    st.plotly_chart(fig_net_neg_val)
+    with st.expander("Ver datos de flujo neto negativo (valor)"):
+        st.dataframe(top_net_negative)
+
+    top_net_negative_mc = net_flow_df.sort_values('Net_Change_MC', ascending=True).head(20)
+    fig_net_neg_mc = px.bar(top_net_negative_mc, x='Ticker', y='Net_Change_MC', title="Top 20 Tickers por Flujo Neto Negativo (% Market Cap)", color_discrete_sequence=['#d62728'])
+    fig_net_neg_mc.update_layout(yaxis_title="Flujo Neto (% Market Cap)", yaxis_ticksuffix="%")
+    st.plotly_chart(fig_net_neg_mc)
+    with st.expander("Ver datos de flujo neto negativo (% market cap)"):
+        st.dataframe(top_net_negative_mc.style.format({'Net_Change_MC': '{:.4f}%'}))
 
 elif option == "Análisis Adicional":
     st.header("Análisis Adicional")
