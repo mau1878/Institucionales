@@ -157,7 +157,7 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
                      },
                      hover_name='label',
                      hover_data={'label': False, 'x': False, 'y': False, 'count': True, 'entities': True},
-                     size_max=60,
+                     size_max=30,
                      title=title)
 
     fig.update_traces(
@@ -178,7 +178,7 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
-        height=400,
+        height=800,
         title_font_color="white",
         paper_bgcolor='rgba(0,0,0,0)'
     )
