@@ -175,7 +175,9 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
-        height=400
+        width=500,
+        height=500,
+        autosize=False
     )
 
     # This is the key fix to prevent stretching and maintain circular shapes
