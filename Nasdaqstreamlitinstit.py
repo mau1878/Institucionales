@@ -90,7 +90,7 @@ st.title("Análisis de Tenencias Institucionales")
 st.sidebar.header("Entrada del Usuario")
 option = st.sidebar.radio("Elige una opción:",
                           ["Análisis de Tenedor Institucional", "Análisis por Ticker", "Comparación",
-                           "Análisis de Coincidencias", "Análisis Adicional"])
+                           "Análisis de Coincidencias", "Rankings de Mercado", "Análisis Adicional"])
 
 
 def plot_top_20(df, x, y, title, color):
@@ -434,7 +434,7 @@ elif option == "Análisis por Ticker":
         fig_val.update_layout(xaxis_title="Tenedor Institucional", yaxis_title="Valor Total (millones USD)")
         st.plotly_chart(fig_val)
 
-        # New: Rank of most valuable changes in positions (by holders for this ticker)
+        # New: Rank de most valuable changes in positions (by holders for this ticker)
         st.write("### Rank de Cambios en Posiciones Más Valiosos (por USD)")
         ticker_change_sorted = ticker_data.sort_values(by="Change in Value", ascending=False).head(20)
         colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in
@@ -593,6 +593,103 @@ elif option == "Análisis de Coincidencias":
         st.plotly_chart(fig)
     else:
         st.write(f"No hay tickers con más de {threshold}% de tenedores institucionales en común.")
+
+# --- NEW SECTION: Market Rankings ---
+elif option == "Rankings de Mercado":
+    st.header("Rankings de Mercado")
+    st.write("""
+    Esta sección clasifica los tickers según la actividad de compra y venta de los tenedores institucionales.
+    - **Términos Absolutos:** Se refiere al número de tenedores que realizaron una acción (abrir, aumentar, disminuir, cerrar posición).
+    - **Términos Relativos:** Se refiere al valor total en USD o al porcentaje total de acciones involucradas en la acción.
+    """)
+
+    # --- 1. New Positions ---
+    st.subheader("🏆 Top Tickers por Apertura de Nuevas Posiciones")
+    new_positions_df = merged_data[np.isinf(merged_data['Shares Change % num'])]
+
+    # Absolute
+    st.markdown("#### Por Número de Tenedores (Absoluto)")
+    new_abs = new_positions_df.groupby('Ticker')['Owner Name'].nunique().reset_index(name='Número de Nuevas Posiciones')
+    top_new_abs = new_abs.sort_values('Número de Nuevas Posiciones', ascending=False).head(20)
+    fig_new_abs = px.bar(top_new_abs, x='Ticker', y='Número de Nuevas Posiciones', title="Top 20 Tickers por Nuevas Posiciones Abiertas")
+    st.plotly_chart(fig_new_abs)
+    with st.expander("Ver datos de nuevas posiciones (absoluto)"):
+        st.dataframe(top_new_abs)
+
+    # Relative (Value)
+    st.markdown("#### Por Valor de las Nuevas Posiciones (Relativo - USD)")
+    new_val = new_positions_df.groupby('Ticker')['Change in Value'].sum().reset_index(name='Valor Total (Millones USD)')
+    top_new_val = new_val.sort_values('Valor Total (Millones USD)', ascending=False).head(20)
+    fig_new_val = px.bar(top_new_val, x='Ticker', y='Valor Total (Millones USD)', title="Top 20 Tickers por Valor de Nuevas Posiciones")
+    st.plotly_chart(fig_new_val)
+    with st.expander("Ver datos de nuevas posiciones (valor)"):
+        st.dataframe(top_new_val)
+
+    # --- 2. Increased Positions ---
+    st.subheader("📈 Top Tickers por Aumento de Posiciones Existentes")
+    increased_positions_df = merged_data[(merged_data['Shares Change'] > 0) & (merged_data['Previous Shares'] > 0)]
+
+    # Absolute
+    st.markdown("#### Por Número de Tenedores (Absoluto)")
+    inc_abs = increased_positions_df.groupby('Ticker')['Owner Name'].nunique().reset_index(name='Número de Posiciones Aumentadas')
+    top_inc_abs = inc_abs.sort_values('Número de Posiciones Aumentadas', ascending=False).head(20)
+    fig_inc_abs = px.bar(top_inc_abs, x='Ticker', y='Número de Posiciones Aumentadas', title="Top 20 Tickers por Aumento de Posiciones")
+    st.plotly_chart(fig_inc_abs)
+    with st.expander("Ver datos de posiciones aumentadas (absoluto)"):
+        st.dataframe(top_inc_abs)
+
+    # Relative (Value)
+    st.markdown("#### Por Valor del Aumento (Relativo - USD)")
+    inc_val = increased_positions_df.groupby('Ticker')['Change in Value'].sum().reset_index(name='Valor Total del Aumento (Millones USD)')
+    top_inc_val = inc_val.sort_values('Valor Total del Aumento (Millones USD)', ascending=False).head(20)
+    fig_inc_val = px.bar(top_inc_val, x='Ticker', y='Valor Total del Aumento (Millones USD)', title="Top 20 Tickers por Valor de Aumento de Posiciones")
+    st.plotly_chart(fig_inc_val)
+    with st.expander("Ver datos de posiciones aumentadas (valor)"):
+        st.dataframe(top_inc_val)
+
+    # --- 3. Decreased Positions ---
+    st.subheader("📉 Top Tickers por Reducción de Posiciones Existentes")
+    decreased_positions_df = merged_data[(merged_data['Shares Change'] < 0) & (merged_data['Shares Held'] > 0)]
+
+    # Absolute
+    st.markdown("#### Por Número de Tenedores (Absoluto)")
+    dec_abs = decreased_positions_df.groupby('Ticker')['Owner Name'].nunique().reset_index(name='Número de Posiciones Reducidas')
+    top_dec_abs = dec_abs.sort_values('Número de Posiciones Reducidas', ascending=False).head(20)
+    fig_dec_abs = px.bar(top_dec_abs, x='Ticker', y='Número de Posiciones Reducidas', title="Top 20 Tickers por Reducción de Posiciones", color_discrete_sequence=['#EF553B'])
+    st.plotly_chart(fig_dec_abs)
+    with st.expander("Ver datos de posiciones reducidas (absoluto)"):
+        st.dataframe(top_dec_abs)
+
+    # Relative (Value)
+    st.markdown("#### Por Valor de la Reducción (Relativo - USD)")
+    dec_val = decreased_positions_df.groupby('Ticker')['Change in Value'].sum().reset_index(name='Valor Total de la Reducción (Millones USD)')
+    top_dec_val = dec_val.sort_values('Valor Total de la Reducción (Millones USD)', ascending=True).head(20)
+    fig_dec_val = px.bar(top_dec_val, x='Ticker', y='Valor Total de la Reducción (Millones USD)', title="Top 20 Tickers por Valor de Reducción de Posiciones", color_discrete_sequence=['#EF553B'])
+    st.plotly_chart(fig_dec_val)
+    with st.expander("Ver datos de posiciones reducidas (valor)"):
+        st.dataframe(top_dec_val)
+
+    # --- 4. Closed Positions ---
+    st.subheader("❌ Top Tickers por Cierre Total de Posiciones")
+    closed_positions_df = merged_data[(merged_data['Shares Held'] == 0) & (merged_data['Previous Shares'] > 0)]
+
+    # Absolute
+    st.markdown("#### Por Número de Tenedores (Absoluto)")
+    closed_abs = closed_positions_df.groupby('Ticker')['Owner Name'].nunique().reset_index(name='Número de Posiciones Cerradas')
+    top_closed_abs = closed_abs.sort_values('Número de Posiciones Cerradas', ascending=False).head(20)
+    fig_closed_abs = px.bar(top_closed_abs, x='Ticker', y='Número de Posiciones Cerradas', title="Top 20 Tickers por Cierre de Posiciones", color_discrete_sequence=['#d62728'])
+    st.plotly_chart(fig_closed_abs)
+    with st.expander("Ver datos de posiciones cerradas (absoluto)"):
+        st.dataframe(top_closed_abs)
+
+    # Relative (Value)
+    st.markdown("#### Por Valor de la Posición Cerrada (Relativo - USD)")
+    closed_val = closed_positions_df.groupby('Ticker')['Change in Value'].sum().reset_index(name='Valor Total de Posiciones Cerradas (Millones USD)')
+    top_closed_val = closed_val.sort_values('Valor Total de Posiciones Cerradas (Millones USD)', ascending=True).head(20)
+    fig_closed_val = px.bar(top_closed_val, x='Ticker', y='Valor Total de Posiciones Cerradas (Millones USD)', title="Top 20 Tickers por Valor de Posiciones Cerradas", color_discrete_sequence=['#d62728'])
+    st.plotly_chart(fig_closed_val)
+    with st.expander("Ver datos de posiciones cerradas (valor)"):
+        st.dataframe(top_closed_val)
 
 elif option == "Análisis Adicional":
     st.header("Análisis Adicional")
