@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import yfinance as yf
 import numpy as np
 import math
+import matplotlib.pyplot as plt
+from matplotlib_venn import venn2, venn3
 
 # Loading and preprocessing data
 institutional_holders = pd.read_csv("institutional_holders.csv")
@@ -268,6 +270,40 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def plot_matplotlib_venn(item_list, comparison_field, data):
+    """
+    Generates a true proportional Venn diagram using the matplotlib-venn library.
+    NOTE: This function requires you to run 'pip install matplotlib-venn' in your environment.
+    """
+    num_items = len(item_list)
+    if not (2 <= num_items <= 3):
+        # This check is important as the library supports 2 or 3 sets.
+        st.warning("La comparación con diagramas de Venn proporcionales solo admite 2 o 3 elementos.")
+        return
+
+    # Determine the entity to compare (Holders or Tickers)
+    if comparison_field == 'Ticker':
+        entity_field = 'Owner Name'
+        title_entities = "Tenedores"
+    else:
+        entity_field = 'Ticker'
+        title_entities = "Tickers"
+
+    title = f"Coincidencia Proporcional de {title_entities} entre {', '.join(item_list)}"
+
+    # Create the sets for the diagram
+    sets = [set(data[data[comparison_field] == item][entity_field].unique()) for item in item_list]
+    set_labels = item_list
+
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(10, 7))  # Create a matplotlib figure and axes
+    if num_items == 2:
+        venn2(subsets=sets, set_labels=set_labels, ax=ax)
+    elif num_items == 3:
+        venn3(subsets=sets, set_labels=set_labels, ax=ax)
+
+    ax.set_title(title)
+    st.pyplot(fig)  # Display the matplotlib figure in Streamlit
 if option == "Análisis de Tenedor Institucional":
     st.header("Análisis de Tenedor Institucional")
     st.write("""
@@ -413,13 +449,14 @@ elif option == "Análisis por Ticker":
         st.write("No hay datos disponibles para el ticker seleccionado.")
 
 # --- CORRECTED SECTION ---
+# --- UPDATED SECTION ---
 elif option == "Comparación":
     st.header("Comparación")
     st.write("""
     **Cómo usar esta sección:**
     - **Elige el tipo de comparación:** Puedes comparar tickers o tenedores institucionales.
-    - **Selecciona múltiples items:** Elige varios tickers o tenedores para comparar sus datos.
-    - **Gráfico de Coincidencias:** Si seleccionas dos o tres ítems, aparecerá un diagrama de Venn mostrando sus tenencias o tickers en común.
+    - **Selecciona 2 o 3 items:** Elige varios tickers o tenedores para comparar sus datos.
+    - **Gráfico de Coincidencias:** Aparecerá un diagrama mostrando las coincidencias entre los items seleccionados.
     """)
 
     comparison_type = st.radio("Elige el tipo de comparación:", ["Tickers", "Tenedores Institucionales"])
@@ -427,23 +464,37 @@ elif option == "Comparación":
     if comparison_type == "Tickers":
         tickers = st.multiselect("Selecciona los Tickers para comparar:", sorted(general_data["Ticker"].unique()))
         if tickers:
-            # Venn plot for two or three tickers
+            # Logic for plotting Venn diagrams
             if len(tickers) in [2, 3]:
                 st.subheader("Gráfico de Coincidencias de Tenedores")
-                st.write(
-                    "Este diagrama de Venn muestra los tenedores institucionales únicos para cada ticker y las coincidencias entre ellos.")
-                plot_venn_like_comparison(tickers, 'Ticker', merged_data)
 
+                # ADDED: Let the user choose the chart type
+                chart_type = st.radio(
+                    "Elige el tipo de gráfico:",
+                    ('Burbujas (Interactivo)', 'Venn (Proporcional y Preciso)'),
+                    key='ticker_chart_choice',
+                    help="El gráfico de Burbujas es interactivo. El gráfico de Venn es una representación matemática precisa de las superposiciones."
+                )
+
+                if chart_type == 'Burbujas (Interactivo)':
+                    st.write(
+                        "Este diagrama de burbujas muestra los tenedores únicos para cada ticker y las coincidencias. El tamaño de las burbujas es proporcional al total de tenedores.")
+                    plot_venn_like_comparison(tickers, 'Ticker', merged_data)
+                else:
+                    st.write(
+                        "Este diagrama de Venn muestra las proporciones exactas de tenedores únicos y compartidos.")
+                    plot_matplotlib_venn(tickers, 'Ticker', merged_data)
+
+            # The rest of the comparison logic remains the same
             comparison_data = merged_data[merged_data['Ticker'].isin(tickers)]
             comparison_data_display = merged_data_display[merged_data_display['Ticker'].isin(tickers)]
             comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
-            st.write("### Comparación de Tickers")
+            st.write("### Tabla de Comparación de Tickers")
             styled_df = comparison_data_display[
                 ["Date", "Ticker", "Owner Name", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
                  "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
             st.dataframe(styled_df)
 
-            # Plotting
             for metric in ["Shares Held", "Percentage Owned", "Individual Holdings Value"]:
                 fig = px.bar(comparison_data, x="Ticker", y=metric, color="Owner Name", barmode="group")
                 fig.update_layout(title=f"Comparación de {metric} por Ticker", xaxis_title="Ticker", yaxis_title=metric)
@@ -453,23 +504,36 @@ elif option == "Comparación":
         holders = st.multiselect("Selecciona los Tenedores Institucionales para comparar:",
                                  sorted(institutional_holders["Owner Name"].unique()))
         if holders:
-            # Venn plot for two or three holders
+            # Logic for plotting Venn diagrams
             if len(holders) in [2, 3]:
                 st.subheader("Gráfico de Coincidencias de Tickers")
-                st.write(
-                    "Este diagrama de Venn muestra los tickers únicos en la cartera de cada tenedor y las coincidencias entre ellos.")
-                plot_venn_like_comparison(holders, 'Owner Name', merged_data)
 
+                # ADDED: Let the user choose the chart type
+                chart_type = st.radio(
+                    "Elige el tipo de gráfico:",
+                    ('Burbujas (Interactivo)', 'Venn (Proporcional y Preciso)'),
+                    key='holder_chart_choice',
+                    help="El gráfico de Burbujas es interactivo. El gráfico de Venn es una representación matemática precisa de las superposiciones."
+                )
+
+                if chart_type == 'Burbujas (Interactivo)':
+                    st.write(
+                        "Este diagrama de burbujas muestra los tickers únicos en la cartera de cada tenedor y las coincidencias. El tamaño de las burbujas es proporcional al total de tickers.")
+                    plot_venn_like_comparison(holders, 'Owner Name', merged_data)
+                else:
+                    st.write("Este diagrama de Venn muestra las proporciones exactas de tickers únicos y compartidos.")
+                    plot_matplotlib_venn(holders, 'Owner Name', merged_data)
+
+            # The rest of the comparison logic remains the same
             comparison_data = merged_data[merged_data['Owner Name'].isin(holders)]
             comparison_data_display = merged_data_display[merged_data_display['Owner Name'].isin(holders)]
             comparison_data_display = comparison_data_display.sort_values(by='Shares Change % num', ascending=False)
-            st.write("### Comparación de Tenedores Institucionales")
+            st.write("### Tabla de Comparación de Tenedores Institucionales")
             styled_df = comparison_data_display[
                 ["Date", "Owner Name", "Ticker", "Shares Held", "Shares Change", "Shares Change %", "Percentage Owned",
                  "Individual Holdings Value"]].style.map(color_percentage, subset=["Shares Change %"])
             st.dataframe(styled_df)
 
-            # Plotting
             for metric in ["Shares Held", "Percentage Owned", "Individual Holdings Value"]:
                 fig = px.bar(comparison_data, x="Owner Name", y=metric, color="Ticker", barmode="group")
                 fig.update_layout(title=f"Comparación de {metric} por Tenedor Institucional",
