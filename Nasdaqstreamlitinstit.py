@@ -119,7 +119,7 @@ def plot_changes(df, x, y_num, title, is_percentage=False):
     st.plotly_chart(fig)
 
 
-# --- NEW FUNCTION ---
+# --- CORRECTED FUNCTION ---
 def plot_venn_like_comparison(item_list, comparison_field, data):
     """
     Generates a Venn-like bubble chart to compare two items for commonalities.
@@ -161,28 +161,37 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
 
     # Create the bubble chart
     fig = px.scatter(plot_df, x='x', y='y', size='count', text='count',
+                     color='label',
+                     color_discrete_map={
+                         f"Solo en {item1_name}": "#636EFA",
+                         f"Solo en {item2_name}": "#EF553B",
+                         "En Común": "#00CC96"
+                     },
                      hover_name='label',
-                     hover_data={'x': False, 'y': False, 'count': True, 'entities': True},
-                     size_max=100,
+                     hover_data={'label': False, 'x': False, 'y': False, 'count': True, 'entities': True},
+                     size_max=120,
                      title=title)
 
     fig.update_traces(
         textposition='top center',
         textfont_size=16,
         marker=dict(
-            sizemin=20,
+            sizemin=30,
             sizemode='diameter',
-            color=['#636EFA', '#EF553B', '#00CC96']
+            opacity=0.8
         )
     )
 
     fig.update_layout(
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title='', range=[-1.2, 1.2]),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
         height=400
     )
+
+    # This is the key fix to prevent stretching and maintain circular shapes
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -331,7 +340,7 @@ elif option == "Análisis por Ticker":
     else:
         st.write("No hay datos disponibles para el ticker seleccionado.")
 
-# --- MODIFIED SECTION ---
+# --- CORRECTED SECTION ---
 elif option == "Comparación":
     st.header("Comparación")
     st.write("""
@@ -404,8 +413,8 @@ elif option == "Análisis de Coincidencias":
 - **Tickers con más Tenedores Institucionales en Común:** Muestra qué empresas tienen el mayor número de tenedores institucionales, lo que podría señalar un fuerte interés o respaldo institucional hacia esas empresas.
 
 **Calculación de Coincidencias:**
-- **Para Tenedores:** Se calcula el porcentaje de todos los tickers únicos en los que cada tenedor está invertido. 
-- **Para Tickers:** Se calcula el porcentaje de todos los tenedores únicos que invierten en cada ticker. 
+- **Para Tenedores:** Se calcula el porcentaje de todos los tickers únicos en los que cada tenedor está invertido.
+- **Para Tickers:** Se calcula el porcentaje de todos los tenedores únicos que invierten en cada ticker.
 - El porcentaje se obtiene dividiendo el número de tickers/tenedores únicos asociados por el total de tickers/tenedores únicos en el conjunto de datos, multiplicado por 100.
 """)
 
