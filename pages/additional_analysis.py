@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import yfinance as yf
 from utils.data_processing import color_percentage
+import numpy as np
 
 # Set custom page title for sidebar
 st.set_page_config(page_title="Análisis Adicional", layout="wide")
