@@ -7,6 +7,7 @@ from utils.data_processing import color_percentage
 
 # Set custom page title for sidebar
 st.set_page_config(page_title="Análisis por Ticker", layout="wide")
+st.write(f"Debug: Page title set to 'Análisis por Ticker'")  # Debug message
 
 if 'merged_data' not in st.session_state:
     st.error("Datos no cargados. Por favor, revisa la página principal.")
