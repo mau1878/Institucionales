@@ -26,13 +26,9 @@ merged_data = st.session_state.merged_data
 merged_data_display = st.session_state.merged_data_display
 
 # Apply global date filter
-# Apply global date filter safely
-if 'selected_date' in st.session_state and st.session_state.selected_date is not None:
+if st.session_state.selected_date:
     merged_data = merged_data[merged_data['Date'] == st.session_state.selected_date]
     merged_data_display = merged_data_display[merged_data_display['Date'] == st.session_state.selected_date]
-
-# Ensure 'Shares Change % num' is numeric
-merged_data['Shares Change % num'] = pd.to_numeric(merged_data['Shares Change % num'], errors='coerce')
 
 threshold = st.slider("Selecciona el umbral de coincidencia en porcentaje:", 0, 100, 50)
 
