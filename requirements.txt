@@ -6,3 +6,4 @@ streamlit-aggrid
 yfinance
 matplotlib
 matplotlib_venn
+pyarrow

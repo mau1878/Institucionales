@@ -11,8 +11,8 @@ from matplotlib_venn import venn2, venn3
 # --- Data Loading and Caching ---
 @st.cache_data
 def load_data():
-    institutional_holders = pd.read_csv("institutional_holders.csv")
-    general_data = pd.read_csv("general_data.csv")
+    institutional_holders = pd.read_parquet("institutional_holders.parquet", engine="pyarrow")
+    general_data = pd.read_parquet("general_data.parquet", engine="pyarrow")
     return institutional_holders, general_data
 
 @st.cache_data
@@ -37,14 +37,6 @@ def get_market_caps(tickers_list):
 # --- Main App Logic ---
 institutional_holders, general_data = load_data()
 
-# Preprocess institutional_holders
-institutional_holders["Shares Held"] = institutional_holders["Shares Held"].str.replace(",", "").astype(float)
-institutional_holders["Shares Change"] = institutional_holders["Shares Change"].str.replace(",", "").astype(float)
-
-# Preprocess general_data
-general_data["Total Shares Outstanding"] = general_data["Total Shares Outstanding"].str.replace(",", "").astype(float)
-general_data["Total Holdings Value"] = general_data["Total Holdings Value"].str.replace("$", "").str.replace(",", "").astype(float)
-general_data["Institutional Ownership %"] = general_data["Institutional Ownership %"].str.replace("%", "").astype(float) / 100
 
 # Calculate approximate price per share (in dollars)
 general_data["Price per Share"] = (general_data["Total Holdings Value"] * 1e6) / (general_data["Total Shares Outstanding"] * 1e6 * general_data["Institutional Ownership %"])
