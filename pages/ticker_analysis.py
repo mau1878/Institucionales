@@ -6,7 +6,7 @@ from utils.plotting import plot_top_20, plot_changes
 from utils.data_processing import color_percentage
 
 # Set custom page title for sidebar
-st.set_page_config(page_title="Análisis por Ticker", layout="wide")
+st.set_page_config(page_title="Analisis por Ticker", layout="wide")
 st.write(f"Debug: Page title set to 'Análisis por Ticker'")  # Debug message
 
 if 'merged_data' not in st.session_state:
