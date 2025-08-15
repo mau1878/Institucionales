@@ -5,6 +5,10 @@ import plotly.graph_objects as go
 from utils.plotting import plot_top_20, plot_changes
 from utils.data_processing import color_percentage
 
+if 'merged_data' not in st.session_state:
+    st.error("Datos no cargados. Por favor, revisa la página principal.")
+    st.stop()
+
 st.header("Análisis por Ticker")
 st.write("""
 **Cómo usar esta sección:**

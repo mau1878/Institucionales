@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
+if 'merged_data' not in st.session_state:
+    st.error("Datos no cargados. Por favor, revisa la página principal.")
+    st.stop()
+
 st.header("Análisis de Coincidencias")
 st.write("""
 **Cómo usar esta sección:**
