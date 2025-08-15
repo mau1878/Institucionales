@@ -5,6 +5,9 @@ import plotly.graph_objects as go
 import yfinance as yf
 from utils.data_processing import color_percentage
 
+# Set custom page title for sidebar
+st.set_page_config(page_title="Análisis Adicional", layout="wide")
+
 if 'merged_data' not in st.session_state:
     st.error("Datos no cargados. Por favor, revisa la página principal.")
     st.stop()

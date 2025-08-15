@@ -3,6 +3,9 @@ import pandas as pd
 import plotly.express as px
 import numpy as np  # Add this import
 
+# Set custom page title for sidebar
+st.set_page_config(page_title="Rankings de Mercado", layout="wide")
+
 if 'merged_data' not in st.session_state:
     st.error("Datos no cargados. Por favor, revisa la página principal.")
     st.stop()
