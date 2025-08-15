@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import numpy as np  # Add this import
 
 if 'merged_data' not in st.session_state:
     st.error("Datos no cargados. Por favor, revisa la página principal.")

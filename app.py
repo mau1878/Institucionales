@@ -3,7 +3,7 @@ import pandas as pd
 from utils.data_processing import load_data, get_market_caps, preprocess_data
 
 st.set_page_config(page_title="Análisis de Tenencias Institucionales", layout="wide")
-
+st.header("POR FAVOR ESPERAR A QUE SE CARGUEN LOS DATOS Y SE DIGA QUE SE CARGARON CON ÉXITO!!!")
 # Initialize session state for data
 if 'merged_data' not in st.session_state:
     try:
