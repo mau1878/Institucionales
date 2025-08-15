@@ -7,6 +7,7 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib_venn import venn2, venn3
 
+
 def plot_top_20(df, x, y, title, color):
     df = df.sort_values(by=y, ascending=False)
     top_20 = df.head(20)
@@ -21,16 +22,35 @@ def plot_top_20(df, x, y, title, color):
     fig.update_layout(xaxis_title=x, yaxis_title=y)
     st.plotly_chart(fig, use_container_width=True)
 
+
 def plot_changes(df, x, y_num, title, is_percentage=False):
-    plot_df = df[~np.isinf(df[y_num])].copy()
-    plot_df = plot_df.sort_values(by=y_num, ascending=False)
-    top_20 = plot_df.head(20)
+    try:
+        # Ensure y_num is numeric
+        df[y_num] = pd.to_numeric(df[y_num], errors='coerce')
 
-    colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in top_20[y_num]]
+        # Filter out NaN and infinite values
+        plot_df = df[~df[y_num].isna() & ~np.isinf(df[y_num].fillna(np.inf))].copy()
 
-    fig = go.Figure(data=[go.Bar(x=top_20[x], y=top_20[y_num], marker_color=colors)])
-    fig.update_layout(title=title, xaxis_title=x, yaxis_title='Shares Change %' if is_percentage else 'Shares Change')
-    st.plotly_chart(fig, use_container_width=True)
+        if plot_df.empty:
+            st.warning(f"No hay datos válidos para graficar {title}.")
+            return
+
+        plot_df = plot_df.sort_values(by=y_num, ascending=False).head(20)
+        colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in plot_df[y_num]]
+
+        fig = go.Figure(data=[
+            go.Bar(x=plot_df[x], y=plot_df[y_num], marker_color=colors)
+        ])
+        fig.update_layout(
+            title=title,
+            xaxis_title=x,
+            yaxis_title='Shares Change %' if is_percentage else 'Shares Change',
+            yaxis_ticksuffix="%" if is_percentage else ""
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Error al generar el gráfico de cambios: {str(e)}")
+
 
 def plot_venn_like_comparison(item_list, comparison_field, data):
     num_items = len(item_list)
@@ -144,10 +164,14 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
             st.write(f"**Solo en {n1} ({counts['s1_only']}):** {', '.join(list(s1_only)) if s1_only else 'Ninguno'}")
             st.write(f"**Solo en {n2} ({counts['s2_only']}):** {', '.join(list(s2_only)) if s2_only else 'Ninguno'}")
             st.write(f"**Solo en {n3} ({counts['s3_only']}):** {', '.join(list(s3_only)) if s3_only else 'Ninguno'}")
-            st.write(f"**Común entre {n1} y {n2} ({counts['s1_s2']}):** {', '.join(list(s1_s2)) if s1_s2 else 'Ninguno'}")
-            st.write(f"**Común entre {n1} y {n3} ({counts['s1_s3']}):** {', '.join(list(s1_s3)) if s1_s3 else 'Ninguno'}")
-            st.write(f"**Común entre {n2} y {n3} ({counts['s2_s3']}):** {', '.join(list(s2_s3)) if s2_s3 else 'Ninguno'}")
-            st.write(f"**Común entre los tres ({counts['s1_s2_s3']}):** {', '.join(list(s1_s2_s3)) if s1_s2_s3 else 'Ninguno'}")
+            st.write(
+                f"**Común entre {n1} y {n2} ({counts['s1_s2']}):** {', '.join(list(s1_s2)) if s1_s2 else 'Ninguno'}")
+            st.write(
+                f"**Común entre {n1} y {n3} ({counts['s1_s3']}):** {', '.join(list(s1_s3)) if s1_s3 else 'Ninguno'}")
+            st.write(
+                f"**Común entre {n2} y {n3} ({counts['s2_s3']}):** {', '.join(list(s2_s3)) if s2_s3 else 'Ninguno'}")
+            st.write(
+                f"**Común entre los tres ({counts['s1_s2_s3']}):** {', '.join(list(s1_s2_s3)) if s1_s2_s3 else 'Ninguno'}")
 
     fig.update_layout(
         title_text=title,
@@ -160,6 +184,7 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
     )
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
     st.plotly_chart(fig, use_container_width=True)
+
 
 def plot_matplotlib_venn(item_list, comparison_field, data):
     num_items = len(item_list)
