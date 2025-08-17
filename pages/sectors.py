@@ -20,14 +20,25 @@ for col in ["Sector", "Industry"]:
 
 # === Selección de nivel de análisis ===
 opcion = st.radio("📊 Seleccionar nivel de análisis:", ["Sector", "Industria"])
+group_field = "Sector" if opcion == "Sector" else "Industry"
 
-if opcion == "Sector":
-    group_field = "Sector"
-else:
-    group_field = "Industry"
-if group_field not in merged_data.columns:
-    st.error(f"La columna '{group_field}' no existe en los datos.")
+# === Calcular estadísticas por grupo ANTES de las tabs ===
+group_stats = (
+    merged_data.groupby(group_field)
+    .agg({
+        "Individual Holdings Value": "sum",
+        "Percentage Owned": "mean",
+        "Ticker": "nunique"
+    })
+    .rename(columns={
+        "Individual Holdings Value": "Valor Total (USD millones)",
+        "Percentage Owned": "Promedio % de Propiedad",
+        "Ticker": "Número de Tickers"
+    })
+    .sort_values("Valor Total (USD millones)", ascending=False)
+)
 
+# === Crear tabs ===
 tabs = st.tabs([
     f"📈 Estadísticas por {opcion}",
     f"🏆 Top {opcion}",
@@ -39,6 +50,8 @@ tabs = st.tabs([
 with tabs[0]:
     st.subheader(f"📈 Estadísticas generales por {opcion}")
     st.dataframe(group_stats, use_container_width=True)
+
+# === Tab 2, 3, 4 ... igual que antes
 
 # === Tab 2: Top sectores / industrias por valor total ===
 with tabs[1]:
