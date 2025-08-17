@@ -232,3 +232,30 @@ def plot_sector_industry(df, group_field, value_field="Valor Total (USD millones
     )
     fig.update_traces(textposition='inside', textinfo='percent+label')
     st.plotly_chart(fig, use_container_width=True)
+
+
+def plot_holder_composition(merged_data, holder_name, group_field="Sector"):
+    """
+    Grafica la composición de cartera de un tenedor según sector o industria.
+    """
+    holder_data = merged_data[merged_data["Owner Name"] == holder_name]
+
+    if holder_data.empty:
+        st.warning(f"No hay datos para el tenedor {holder_name}")
+        return
+
+    holder_group = (
+        holder_data.groupby(group_field)["Individual Holdings Value"]
+        .sum()
+        .reset_index()
+        .sort_values("Individual Holdings Value", ascending=False)
+    )
+
+    fig = px.pie(
+        holder_group,
+        names=group_field,
+        values="Individual Holdings Value",
+        title=f"Composición de cartera de {holder_name} por {group_field}",
+        hole=0.3
+    )
+    st.plotly_chart(fig, use_container_width=True)
