@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-from data_processing import load_data, get_market_caps, preprocess_data
-from plotting import plot_top_20
+from utils.data_processing import load_data, get_market_caps, preprocess_data
+from utils.plotting import plot_top_20
 
 st.set_page_config(page_title="Tenedores Institucionales por Sector e Industria", layout="wide")
 
