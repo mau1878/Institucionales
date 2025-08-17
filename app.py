@@ -23,7 +23,15 @@ if 'merged_data' not in st.session_state:
     except Exception as e:
         st.error(f"Error al cargar los datos: {str(e)}")
         st.stop()
+# Función para limpiar cache
+def clear_preprocess_cache():
+    """Borra forzosamente el cache de preprocess_data."""
+    preprocess_data.clear()
+    st.success("Cache de datos forzadamente borrado. Los datos se regenerarán al recargar.")
 
+# Botón para limpiar cache
+if st.button("Regenerar datos"):
+    clear_preprocess_cache()
 # Global date filter
 try:
     st.sidebar.header("Filtro por Fecha")
