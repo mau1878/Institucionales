@@ -52,8 +52,6 @@ tabs = st.tabs([
     f"🏆 Top {opcion}",
     f"🔎 Detalle por {opcion}",
     "📊 Composición de tenedor",
-    "📊 Distribución por tenedor",
-    "💹 Heatmap de holdings",
     "📊 Concentración de mercado",
     "📊 Comparación entre tenedores"
 ])
@@ -113,23 +111,15 @@ with tabs[3]:
     if selected_holder:
         plot_holder_composition(merged_data, selected_holder, group_field)
 
-# === Tab 5: Distribución de holdings por tenedor (barras apiladas) ===
-with tabs[4]:
-    st.subheader("📊 Distribución de holdings por tenedor")
-    plot_holder_distribution(merged_data, group_field)
 
-# === Tab 6: Heatmap de correlación de tenedores por sector/industria ===
-with tabs[5]:
-    st.subheader("💹 Heatmap de holdings por tenedor")
-    plot_holders_heatmap(merged_data, group_field)
 
 # === Tab 7: Concentración de mercado ===
-with tabs[6]:
+with tabs[5]:
     st.subheader("📊 Concentración de mercado")
     plot_market_concentration(merged_data, group_field, top_n=5)
 
 # === Tab 8: Comparación sectorial entre varios tenedores ===
-with tabs[7]:
+with tabs[6]:
     st.subheader("📊 Comparación entre tenedores")
     selected_holders = st.multiselect(
         "Seleccionar tenedores:",
