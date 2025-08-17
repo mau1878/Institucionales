@@ -1,16 +1,23 @@
 import streamlit as st
 import pandas as pd
 from utils.data_processing import load_data, get_market_caps, preprocess_data
-from utils.plotting import plot_top_20, plot_holder_composition
+from utils.plotting import (
+    plot_top_20,
+    plot_holder_composition,
+    plot_holder_distribution,
+    plot_holders_heatmap,
+    plot_market_concentration,
+    plot_multiple_holders_comparison
+)
 
 st.set_page_config(page_title="Tenedores Institucionales por Sector e Industria", layout="wide")
-
 st.title("🏦 Tenedores Institucionales por Sector e Industria")
 
 # === Cargar datos ===
 institutional_holders, general_data = load_data()
 live_market_caps = get_market_caps(general_data['Ticker'].unique())
 merged_data, merged_data_display = preprocess_data(institutional_holders, general_data, live_market_caps)
+
 # 🔹 Asegurarse de que las columnas existen y rellenar NaN
 for col in ["Sector", "Industry"]:
     if col not in merged_data.columns:
@@ -43,15 +50,17 @@ tabs = st.tabs([
     f"📈 Estadísticas por {opcion}",
     f"🏆 Top {opcion}",
     f"🔎 Detalle por {opcion}",
-    "📊 Composición de tenedor"
+    "📊 Composición de tenedor",
+    "📊 Distribución por tenedor",
+    "💹 Heatmap de holdings",
+    "📊 Concentración de mercado",
+    "📊 Comparación entre tenedores"
 ])
 
 # === Tab 1: Estadísticas generales ===
 with tabs[0]:
     st.subheader(f"📈 Estadísticas generales por {opcion}")
     st.dataframe(group_stats, use_container_width=True)
-
-# === Tab 2, 3, 4 ... igual que antes
 
 # === Tab 2: Top sectores / industrias por valor total ===
 with tabs[1]:
@@ -64,15 +73,12 @@ with tabs[1]:
         color="blue"
     )
 
-# === Tab 3: Análisis detallado por sector/industria ===
+# === Tab 3: Detalle por sector/industria ===
 with tabs[2]:
     st.subheader(f"🔎 Análisis detallado por {opcion}")
-    selected = st.selectbox(f"Seleccionar {opcion}:", group_stats.index)
-
+    selected = st.selectbox(f"Seleccionar {opcion}:", group_stats.index, key="tab3_select")
     if selected:
         filtered = merged_data[merged_data[group_field] == selected]
-
-        # Top tenedores dentro del sector/industria
         top_holders = (
             filtered.groupby("Owner Name")
             .agg({
@@ -85,10 +91,8 @@ with tabs[2]:
             })
             .sort_values("Valor Total (USD millones)", ascending=False)
         )
-
         st.write(f"### 🏦 Principales tenedores en {selected}")
         st.dataframe(top_holders.head(15), use_container_width=True)
-
         plot_top_20(
             top_holders.reset_index(),
             x="Owner Name",
@@ -102,8 +106,35 @@ with tabs[3]:
     st.subheader("📊 Composición de cartera de un tenedor")
     selected_holder = st.selectbox(
         "Seleccionar tenedor:",
-        merged_data["Owner Name"].unique()
+        merged_data["Owner Name"].unique(),
+        key="tab4_select"
     )
-
     if selected_holder:
         plot_holder_composition(merged_data, selected_holder, group_field)
+
+# === Tab 5: Distribución de holdings por tenedor (barras apiladas) ===
+with tabs[4]:
+    st.subheader("📊 Distribución de holdings por tenedor")
+    plot_holder_distribution(merged_data, group_field)
+
+# === Tab 6: Heatmap de correlación de tenedores por sector/industria ===
+with tabs[5]:
+    st.subheader("💹 Heatmap de holdings por tenedor")
+    plot_holders_heatmap(merged_data, group_field)
+
+# === Tab 7: Concentración de mercado ===
+with tabs[6]:
+    st.subheader("📊 Concentración de mercado")
+    plot_market_concentration(merged_data, group_field, top_n=5)
+
+# === Tab 8: Comparación sectorial entre varios tenedores ===
+with tabs[7]:
+    st.subheader("📊 Comparación entre tenedores")
+    selected_holders = st.multiselect(
+        "Seleccionar tenedores:",
+        merged_data["Owner Name"].unique(),
+        default=merged_data["Owner Name"].unique()[:3],
+        key="tab8_select"
+    )
+    if selected_holders:
+        plot_multiple_holders_comparison(merged_data, selected_holders, group_field)
