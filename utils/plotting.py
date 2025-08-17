@@ -212,3 +212,23 @@ def plot_matplotlib_venn(item_list, comparison_field, data):
     )
 
     st.pyplot(fig)
+def plot_sector_industry(df, group_field, value_field="Valor Total (USD millones)", color="blue"):
+    """Grafica top sectores/industrias y su proporción total en holdings institucionales."""
+    # 🔹 Gráfico de barras top 20
+    plot_top_20(df.reset_index(), x=group_field, y=value_field, title=f"Top {group_field}", color=color)
+
+    # 🔹 Gráfico de pastel con la proporción del valor total
+    top_10 = df.head(10)
+    others_value = df.iloc[10:][value_field].sum() if len(df) > 10 else 0
+    pie_labels = list(top_10.index) + (["Otros"] if others_value > 0 else [])
+    pie_values = list(top_10[value_field]) + ([others_value] if others_value > 0 else [])
+
+    import plotly.express as px
+    fig = px.pie(
+        names=pie_labels,
+        values=pie_values,
+        title=f"Distribución de {group_field} por Valor Total en holdings institucionales",
+        color_discrete_sequence=px.colors.qualitative.Set3
+    )
+    fig.update_traces(textposition='inside', textinfo='percent+label')
+    st.plotly_chart(fig, use_container_width=True)

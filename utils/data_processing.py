@@ -81,3 +81,21 @@ def color_percentage(val):
     else:
         color = 'green' if val > 0 else 'red' if val < 0 else 'black'
         return f'color: {color}'
+@st.cache_data
+def aggregate_by_sector_industry(merged_data, level="Sector"):
+    """Agrega estadísticas por Sector o Industria."""
+    group_stats = (
+        merged_data.groupby(level)
+        .agg({
+            "Individual Holdings Value": "sum",
+            "Percentage Owned": "mean",
+            "Ticker": "nunique"
+        })
+        .rename(columns={
+            "Individual Holdings Value": "Valor Total (USD millones)",
+            "Percentage Owned": "Promedio % de Propiedad",
+            "Ticker": "Número de Tickers"
+        })
+        .sort_values("Valor Total (USD millones)", ascending=False)
+    )
+    return group_stats
