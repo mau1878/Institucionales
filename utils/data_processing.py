@@ -59,33 +59,30 @@ def get_market_caps(tickers_list):
     return market_caps
 @st.cache_data
 def preprocess_data(institutional_holders, general_data, live_market_caps):
-    # 🔹 Merge live market caps
-    if live_market_caps:
-        market_cap_df = pd.DataFrame(list(live_market_caps.items()), columns=['Ticker', 'Market Cap'])
-        general_data = pd.merge(general_data, market_cap_df, on='Ticker', how='left')
+    # Merge datos primero
+    merged_data = pd.merge(institutional_holders, general_data, on="Ticker", how="left")
 
-    # 🔹 Completar Market Cap si falta
-    general_data['Market Cap'] = general_data.get('Market Cap',
-        general_data['Price per Share'] * general_data['Total Shares Outstanding'] * 1e6
-    )
-    general_data['Market Cap'].fillna(
-        general_data['Price per Share'] * general_data['Total Shares Outstanding'] * 1e6, inplace=True
-    )
-
-    # 🔹 Merge final
-    merged_data = pd.merge(institutional_holders, general_data, on="Ticker")
-
-    # 🔹 Asegurar Sector e Industry
+    # 🔹 Asegurarse de tener Sector e Industry
     for col in ["Sector", "Industry"]:
         if col not in merged_data.columns:
             merged_data[col] = "Sin Datos"
         else:
             merged_data[col] = merged_data[col].fillna("Sin Datos")
 
-    # 🔹 Cálculos financieros
+    # Calcular Price per Share
     merged_data["Price per Share"] = (merged_data["Total Holdings Value"] * 1e6) / (
         merged_data["Total Shares Outstanding"] * 1e6 * merged_data["Institutional Ownership %"]
     )
+
+    # Merge live market caps
+    if live_market_caps:
+        market_cap_df = pd.DataFrame(list(live_market_caps.items()), columns=['Ticker', 'Market Cap'])
+        merged_data = pd.merge(merged_data, market_cap_df, on='Ticker', how='left')
+
+    merged_data['Market Cap'] = merged_data.get('Market Cap', merged_data['Price per Share'] * merged_data['Total Shares Outstanding'] * 1e6)
+    merged_data['Market Cap'].fillna(merged_data['Price per Share'] * merged_data['Total Shares Outstanding'] * 1e6, inplace=True)
+
+    # Cálculos adicionales
     merged_data["Percentage Owned"] = (merged_data["Shares Held"] / (merged_data["Total Shares Outstanding"] * 1e6)) * 100
     merged_data["Individual Holdings Value"] = merged_data["Shares Held"] * merged_data["Price per Share"] / 1e6
     merged_data['Date'] = pd.to_datetime(merged_data['Date'])
@@ -96,7 +93,7 @@ def preprocess_data(institutional_holders, general_data, live_market_caps):
         0
     )
 
-    # 🔹 Porcentaje de cambio de acciones
+    # Percentage change
     merged_data["Previous Shares"] = merged_data["Shares Held"] - merged_data["Shares Change"]
     merged_data["Shares Change %"] = np.where(
         merged_data["Previous Shares"] != 0,
@@ -105,13 +102,14 @@ def preprocess_data(institutional_holders, general_data, live_market_caps):
     )
     merged_data["Shares Change % num"] = merged_data["Shares Change %"]
 
-    # 🔹 Para display en Streamlit
+    # Display DataFrame
     merged_data_display = merged_data.copy()
     merged_data_display["Shares Change %"] = merged_data_display["Shares Change %"].apply(
         lambda x: 'New Position' if np.isinf(x) else f"{x:.2f}%" if not np.isnan(x) else 'N/A'
     )
 
     return merged_data, merged_data_display
+
 
 
 def color_percentage(val):
