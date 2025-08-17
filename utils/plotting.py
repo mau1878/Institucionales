@@ -310,9 +310,10 @@ def plot_market_concentration(merged_data, group_field, top_n=5):
     Muestra top N tenedores que concentran más del X% de cada sector/industria
     """
     df = merged_data.copy()
-    df["Pct of Group"] = df.groupby(group_field)["Individual Holdings Value"].apply(
+    df["Pct of Group"] = df.groupby(group_field)["Individual Holdings Value"].transform(
         lambda x: x / x.sum() * 100
     )
+
     top_holders = df.groupby([group_field, "Owner Name"])["Pct of Group"].sum().reset_index()
     top_holders = top_holders.sort_values(["Pct of Group"], ascending=False)
     fig = px.bar(
