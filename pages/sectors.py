@@ -11,6 +11,12 @@ st.title("🏦 Tenedores Institucionales por Sector e Industria")
 institutional_holders, general_data = load_data()
 live_market_caps = get_market_caps(general_data['Ticker'].unique())
 merged_data, merged_data_display = preprocess_data(institutional_holders, general_data, live_market_caps)
+# 🔹 Asegurarse de que las columnas existen y rellenar NaN
+for col in ["Sector", "Industry"]:
+    if col not in merged_data.columns:
+        merged_data[col] = "Sin Datos"
+    else:
+        merged_data[col] = merged_data[col].fillna("Sin Datos")
 
 # === Selección de nivel de análisis ===
 opcion = st.radio("📊 Seleccionar nivel de análisis:", ["Sector", "Industria"])
@@ -19,6 +25,8 @@ if opcion == "Sector":
     group_field = "Sector"
 else:
     group_field = "Industry"
+if group_field not in merged_data.columns:
+    st.error(f"La columna '{group_field}' no existe en los datos.")
 
 # === Estadísticas generales ===
 st.subheader(f"📈 Estadísticas generales por {opcion}")
