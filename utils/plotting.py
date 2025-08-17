@@ -259,34 +259,55 @@ def plot_holders_heatmap(merged_data, group_field):
     st.plotly_chart(fig, use_container_width=True)
     st.write("✅ plot_holders_heatmap ejecutada")
 
-def plot_market_concentration(merged_data, group_field, top_n=5):
+def plot_market_concentration(merged_data, group_field, top_n=5, top_bottom="Top N"):
     """
-    Muestra top N tenedores que concentran más del X% de cada sector/industria
+    Muestra top N o bottom N tenedores que concentran más del X% de cada sector/industria
     """
-    if merged_data.empty:
-        st.warning("No hay datos disponibles para concentración de mercado.")
-        return
+    import plotly.express as px
+    import streamlit as st
 
     df = merged_data.copy()
-    df["Pct of Group"] = df.groupby(group_field)["Individual Holdings Value"].transform(
-        lambda x: x / x.sum() * 100 if x.sum() != 0 else 0
-    )
 
-    top_holders = df.groupby([group_field, "Owner Name"])["Pct of Group"].sum().reset_index()
-    if top_holders.empty:
-        st.warning("No hay datos para top holders después de agrupar.")
+    # Validar columna
+    if group_field not in df.columns:
+        st.warning(f"La columna {group_field} no existe en los datos.")
         return
 
-    top_holders = top_holders.sort_values(["Pct of Group"], ascending=False)
+    if df.empty:
+        st.warning("No hay datos para mostrar.")
+        return
+
+    # Calcular % del grupo
+    df["Pct of Group"] = df.groupby(group_field)["Individual Holdings Value"].transform(
+        lambda x: x / x.sum() * 100
+    )
+
+    # Agrupar por grupo + tenedor
+    top_holders = df.groupby([group_field, "Owner Name"])["Pct of Group"].sum().reset_index()
+
+    # Seleccionar top/bottom N por grupo
+    result = pd.DataFrame()
+    for grp, group_df in top_holders.groupby(group_field):
+        group_df = group_df.sort_values("Pct of Group", ascending=(top_bottom=="Bottom N"))
+        result = pd.concat([result, group_df.head(top_n)], ignore_index=True)
+
+    if result.empty:
+        st.warning("No hay tenedores para mostrar en esta selección.")
+        return
+
+    # Graficar
     fig = px.bar(
-        top_holders.head(top_n*len(top_holders[group_field].unique())),
+        result,
         x="Owner Name",
         y="Pct of Group",
         color=group_field,
-        title=f"Top {top_n} tenedores por {group_field} (concentración de mercado)"
+        title=f"{top_bottom} {top_n} tenedores por {group_field} (concentración de mercado)",
+        labels={"Pct of Group": "% del grupo", "Owner Name": "Tenedor"},
+        height=600
     )
     st.plotly_chart(fig, use_container_width=True)
-    st.write("✅ plot_market_concentration ejecutada")
+
+
 
 def plot_multiple_holders_comparison(merged_data, selected_holders, group_field):
     """
