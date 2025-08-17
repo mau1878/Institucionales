@@ -159,6 +159,18 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
         margin=dict(t=80, b=20, l=20, r=20)
     )
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
+    fig.add_annotation(
+        text="M Taurus - X: @mtaurus_ok",
+        xref="paper", yref="paper",
+        x=0.5, y=0.5,
+        showarrow=False,
+        font=dict(size=30, color="rgba(0,0,0,0.2)"),
+        textangle=-30,
+        xanchor="center",
+        yanchor="middle",
+        opacity=0.2
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_matplotlib_venn(item_list, comparison_field, data):
@@ -185,4 +197,18 @@ def plot_matplotlib_venn(item_list, comparison_field, data):
         venn3(subsets=sets, set_labels=set_labels, ax=ax)
 
     ax.set_title(title)
+
+    # 🔹 Add diagonal watermark
+    ax.text(
+        0.5, 0.5, "M Taurus - X: @mtaurus_ok",
+        transform=ax.transAxes,
+        fontsize=30,
+        color="gray",
+        alpha=0.3,
+        ha="center",
+        va="center",
+        rotation=30,
+        zorder=10
+    )
+
     st.pyplot(fig)
