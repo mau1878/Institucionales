@@ -87,6 +87,8 @@ def preprocess_data(institutional_holders, general_data, live_market_caps=None):
 
     # 🔹 Merge final con holders
     merged_data = pd.merge(institutional_holders, general_data, on="Ticker", how="left")
+    print(merged_data.head())
+    print(merged_data.columns)
 
     # 🔹 Asegurarse de que existan las columnas Sector e Industry
     for col in ["Sector", "Industry"]:
