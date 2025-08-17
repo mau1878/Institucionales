@@ -195,38 +195,128 @@ def plot_holder_composition(merged_data, holder_name, group_field="Sector"):
 
 # === Distribución de holdings por tenedor ===
 def plot_holder_distribution(merged_data, group_field):
-    pivot = merged_data.pivot_table(index='Owner Name', columns=group_field, values='Individual Holdings Value', aggfunc='sum', fill_value=0)
-    pivot_pct = pivot.div(pivot.sum(axis=1), axis=0)*100
-    fig = px.bar(pivot_pct, x=pivot_pct.index, y=pivot_pct.columns,
-                 title=f"Distribución de holdings por tenedor según {group_field}",
-                 labels={"value":"% del portafolio","Owner Name":"Tenedor"}, height=600)
+    """
+    Gráfico de barras apiladas: porcentaje de holdings de cada tenedor por sector/industria
+    """
+    if merged_data.empty:
+        st.warning("No hay datos disponibles para la distribución de tenedores.")
+        return
+
+    pivot = merged_data.pivot_table(
+        index='Owner Name',
+        columns=group_field,
+        values='Individual Holdings Value',
+        aggfunc='sum',
+        fill_value=0
+    )
+    if pivot.empty:
+        st.warning("No hay datos después de pivotar para la distribución de tenedores.")
+        return
+
+    pivot_pct = pivot.div(pivot.sum(axis=1), axis=0) * 100
+
+    fig = px.bar(
+        pivot_pct,
+        x=pivot_pct.index,
+        y=pivot_pct.columns,
+        title=f"Distribución de holdings por tenedor según {group_field}",
+        labels={"value": "% del portafolio", "Owner Name": "Tenedor"},
+        height=600
+    )
     fig.update_layout(barmode='stack', xaxis={'categoryorder':'total descending'})
     st.plotly_chart(fig, use_container_width=True)
+    st.write("✅ plot_holder_distribution ejecutada")
 
-# === Heatmap de holdings por tenedor ===
 def plot_holders_heatmap(merged_data, group_field):
-    pivot = merged_data.pivot_table(index='Owner Name', columns=group_field, values='Individual Holdings Value', aggfunc='sum', fill_value=0)
-    pivot_pct = pivot.div(pivot.sum(axis=1), axis=0)*100
-    fig = px.imshow(pivot_pct, labels=dict(x=group_field, y="Tenedor", color="% Holdings"),
-                    x=pivot_pct.columns, y=pivot_pct.index, aspect="auto", color_continuous_scale="RdYlGn")
-    st.plotly_chart(fig, use_container_width=True)
+    """
+    Heatmap: filas = tenedores, columnas = sector/industria, valores = % de holdings
+    """
+    if merged_data.empty:
+        st.warning("No hay datos disponibles para el heatmap de tenedores.")
+        return
 
-# === Concentración de mercado ===
+    pivot = merged_data.pivot_table(
+        index='Owner Name',
+        columns=group_field,
+        values='Individual Holdings Value',
+        aggfunc='sum',
+        fill_value=0
+    )
+    if pivot.empty:
+        st.warning("No hay datos después de pivotar para el heatmap de tenedores.")
+        return
+
+    pivot_pct = pivot.div(pivot.sum(axis=1), axis=0) * 100
+
+    fig = px.imshow(
+        pivot_pct,
+        labels=dict(x=group_field, y="Tenedor", color="% Holdings"),
+        x=pivot_pct.columns,
+        y=pivot_pct.index,
+        aspect="auto",
+        color_continuous_scale="RdYlGn"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.write("✅ plot_holders_heatmap ejecutada")
+
 def plot_market_concentration(merged_data, group_field, top_n=5):
-    df = merged_data.copy()
-    df["Pct of Group"] = df.groupby(group_field)["Individual Holdings Value"].transform(lambda x: x/x.sum()*100)
-    top_holders = df.groupby([group_field,"Owner Name"])["Pct of Group"].sum().reset_index().sort_values(["Pct of Group"], ascending=False)
-    fig = px.bar(top_holders.head(top_n*len(top_holders[group_field].unique())),
-                 x="Owner Name", y="Pct of Group", color=group_field,
-                 title=f"Top {top_n} tenedores por {group_field} (concentración de mercado)")
-    st.plotly_chart(fig, use_container_width=True)
+    """
+    Muestra top N tenedores que concentran más del X% de cada sector/industria
+    """
+    if merged_data.empty:
+        st.warning("No hay datos disponibles para concentración de mercado.")
+        return
 
-# === Comparación sectorial múltiple de tenedores ===
+    df = merged_data.copy()
+    df["Pct of Group"] = df.groupby(group_field)["Individual Holdings Value"].transform(
+        lambda x: x / x.sum() * 100 if x.sum() != 0 else 0
+    )
+
+    top_holders = df.groupby([group_field, "Owner Name"])["Pct of Group"].sum().reset_index()
+    if top_holders.empty:
+        st.warning("No hay datos para top holders después de agrupar.")
+        return
+
+    top_holders = top_holders.sort_values(["Pct of Group"], ascending=False)
+    fig = px.bar(
+        top_holders.head(top_n*len(top_holders[group_field].unique())),
+        x="Owner Name",
+        y="Pct of Group",
+        color=group_field,
+        title=f"Top {top_n} tenedores por {group_field} (concentración de mercado)"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.write("✅ plot_market_concentration ejecutada")
+
 def plot_multiple_holders_comparison(merged_data, selected_holders, group_field):
+    """
+    Comparación sectorial entre varios tenedores
+    """
+    if merged_data.empty:
+        st.warning("No hay datos disponibles para comparar tenedores.")
+        return
+
     df = merged_data[merged_data["Owner Name"].isin(selected_holders)]
-    pivot = df.pivot_table(index="Owner Name", columns=group_field, values="Individual Holdings Value", aggfunc='sum', fill_value=0)
-    pivot_pct = pivot.div(pivot.sum(axis=1), axis=0)*100
-    fig = px.bar(pivot_pct, x=pivot_pct.index, y=pivot_pct.columns, title="Comparación sectorial entre tenedores",
-                 labels={"value":"% del portafolio","Owner Name":"Tenedor"}, height=600)
+    if df.empty:
+        st.warning("No hay datos para los tenedores seleccionados.")
+        return
+
+    pivot = df.pivot_table(
+        index="Owner Name",
+        columns=group_field,
+        values="Individual Holdings Value",
+        aggfunc='sum',
+        fill_value=0
+    )
+    pivot_pct = pivot.div(pivot.sum(axis=1), axis=0) * 100
+    fig = px.bar(
+        pivot_pct,
+        x=pivot_pct.index,
+        y=pivot_pct.columns,
+        title="Comparación sectorial entre tenedores",
+        labels={"value": "% del portafolio", "Owner Name": "Tenedor"},
+        height=600
+    )
     fig.update_layout(barmode='stack', xaxis={'categoryorder':'total descending'})
     st.plotly_chart(fig, use_container_width=True)
+    st.write("✅ plot_multiple_holders_comparison ejecutada")
