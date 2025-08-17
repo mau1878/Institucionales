@@ -7,7 +7,8 @@ from utils.plotting import (
     plot_holder_distribution,
     plot_holders_heatmap,
     plot_market_concentration,
-    plot_multiple_holders_comparison
+    plot_multiple_holders_comparison,
+
 )
 
 st.set_page_config(page_title="Tenedores Institucionales por Sector e Industria", layout="wide")
