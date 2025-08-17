@@ -114,12 +114,12 @@ with tabs[3]:
 
 
 # === Tab 7: Concentración de mercado ===
-with tabs[5]:
+with tabs[4]:
     st.subheader("📊 Concentración de mercado")
     plot_market_concentration(merged_data, group_field, top_n=5)
 
 # === Tab 8: Comparación sectorial entre varios tenedores ===
-with tabs[6]:
+with tabs[5]:
     st.subheader("📊 Comparación entre tenedores")
     selected_holders = st.multiselect(
         "Seleccionar tenedores:",
