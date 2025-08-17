@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import numpy as np
+import os
+from datetime import datetime
 
 @st.cache_data
 def load_data():
@@ -9,8 +11,39 @@ def load_data():
     general_data = pd.read_parquet("general_data.parquet", engine="pyarrow")
     return institutional_holders, general_data
 
-@st.cache_data
+
+MARKET_CAP_CACHE = "market_caps_cache.parquet"
+
+def load_market_caps_cache():
+    """Carga cache de market caps si existe y es del día de hoy."""
+    if os.path.exists(MARKET_CAP_CACHE):
+        try:
+            df = pd.read_parquet(MARKET_CAP_CACHE)
+            cached_date = df.attrs.get("date_cached", "")
+            today_str = datetime.today().strftime("%Y-%m-%d")
+            if cached_date == today_str:
+                # Convertir DataFrame a diccionario
+                return dict(zip(df['Ticker'], df['Market Cap']))
+        except Exception:
+            pass
+    return None
+
+def save_market_caps_cache(market_caps):
+    """Guarda market caps en disco con fecha de hoy."""
+    df = pd.DataFrame(list(market_caps.items()), columns=['Ticker', 'Market Cap'])
+    df.attrs["date_cached"] = datetime.today().strftime("%Y-%m-%d")
+    df.to_parquet(MARKET_CAP_CACHE)
+
+@st.cache_data(ttl=86400)  # máximo 1 día en memoria
 def get_market_caps(tickers_list):
+    """Obtiene market caps de Yahoo Finance usando cache diario en disco."""
+    # Primero intentar cargar cache en disco
+    cached_caps = load_market_caps_cache()
+    if cached_caps:
+        # Filtrar solo los tickers solicitados
+        return {t: cached_caps[t] for t in tickers_list if t in cached_caps}
+
+    # Si no hay cache válido, consultar Yahoo Finance
     market_caps = {}
     for ticker in tickers_list:
         try:
@@ -20,8 +53,10 @@ def get_market_caps(tickers_list):
                 market_caps[ticker] = cap
         except Exception:
             pass
-    return market_caps
 
+    # Guardar cache en disco
+    save_market_caps_cache(market_caps)
+    return market_caps
 @st.cache_data
 def preprocess_data(institutional_holders, general_data, live_market_caps):
     # Calculate approximate price per share
