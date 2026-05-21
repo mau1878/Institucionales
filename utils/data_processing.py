@@ -36,24 +36,21 @@ def save_market_caps_cache(market_caps):
 
 
 @st.cache_data
-def get_market_caps(_tickers_list):  # ← Solo cambiá esto
-    """Obtiene market caps en vivo."""
+def get_market_caps(_tickers_list):
+    """Obtiene market caps en vivo usando cache diario."""
 
-    # Convertimos a lista normal (recomendado)
+    # Convertimos a lista normal
     tickers = list(_tickers_list)
 
-    # Aquí pegás todo el código que ya tenías dentro de la función
-    # (el resto queda exactamente igual)
-    """Obtiene market caps de Yahoo Finance usando cache diario en disco."""
     # Primero intentar cargar cache en disco
     cached_caps = load_market_caps_cache()
     if cached_caps:
         # Filtrar solo los tickers solicitados
-        return {t: cached_caps[t] for t in tickers_list if t in cached_caps}
+        return {t: cached_caps[t] for t in tickers if t in cached_caps}
 
     # Si no hay cache válido, consultar Yahoo Finance
     market_caps = {}
-    for ticker in tickers_list:
+    for ticker in tickers:  # ← cambiado
         try:
             stock = yf.Ticker(ticker)
             cap = stock.info.get('marketCap', None)
