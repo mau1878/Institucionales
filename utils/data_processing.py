@@ -8,7 +8,7 @@ from datetime import datetime
 @st.cache_data
 def load_data():
     institutional_holders = pd.read_parquet("institutional_holders.parquet", engine="pyarrow")
-    general_data = pd.read_parquet("general_data.parquet", engine="pyarrow")
+    general_data = pd.read_parquet("general_data_with_info.parquet", engine="pyarrow")
     return institutional_holders, general_data
 
 
