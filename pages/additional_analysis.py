@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import yfinance as yf
+import numpy as np                    # ← NECESARIO PARA np.isinf
 from utils.data_processing import color_percentage
 
 # Set custom page title for sidebar
