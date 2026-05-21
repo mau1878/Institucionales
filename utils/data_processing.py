@@ -34,8 +34,16 @@ def save_market_caps_cache(market_caps):
     df.attrs["date_cached"] = datetime.today().strftime("%Y-%m-%d")
     df.to_parquet(MARKET_CAP_CACHE)
 
-@st.cache_data(ttl=86400)  # máximo 1 día en memoria
-def get_market_caps(tickers_list):
+
+@st.cache_data
+def get_market_caps(_tickers_list):  # ← Solo cambiá esto
+    """Obtiene market caps en vivo."""
+
+    # Convertimos a lista normal (recomendado)
+    tickers = list(_tickers_list)
+
+    # Aquí pegás todo el código que ya tenías dentro de la función
+    # (el resto queda exactamente igual)
     """Obtiene market caps de Yahoo Finance usando cache diario en disco."""
     # Primero intentar cargar cache en disco
     cached_caps = load_market_caps_cache()
