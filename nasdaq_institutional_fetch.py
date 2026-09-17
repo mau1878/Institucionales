@@ -174,6 +174,14 @@ def main():
 
     inst_path = os.path.join(OUTPUT_DIR, "institutional_holders.parquet")
     gen_path = os.path.join(OUTPUT_DIR, "general_data.parquet")
+
+    # Acumular histórico: si ya existe el parquet, concatenar y deduplicar
+    # (mismo Ticker+Owner+Date se pisa con el dato más reciente).
+    if os.path.exists(inst_path):
+        existing_inst = pd.read_parquet(inst_path)
+        inst_df = pd.concat([existing_inst, inst_df], ignore_index=True)
+        inst_df = inst_df.drop_duplicates(subset=["Ticker", "Owner Name", "Date"], keep="last")
+
     inst_df.to_parquet(inst_path, index=False)
     gen_df.to_parquet(gen_path, index=False)
 
