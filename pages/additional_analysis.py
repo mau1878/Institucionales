@@ -115,9 +115,13 @@ st.write("Nota: Este análisis requiere información sobre sectores, que no est�
 st.subheader("Exploración Interactiva de Datos")
 min_date = merged_data['Date'].min().date()
 max_date = merged_data['Date'].max().date()
-date_range = st.slider("Selecciona un rango de fechas:",
-                       min_value=min_date, max_value=max_date,
-                       value=(min_date, max_date))
+if min_date == max_date:
+    st.info(f"Solo hay datos para una fecha: {min_date}.")
+    date_range = (min_date, max_date)
+else:
+    date_range = st.slider("Selecciona un rango de fechas:",
+                           min_value=min_date, max_value=max_date,
+                           value=(min_date, max_date))
 
 date_range_pandas = pd.to_datetime(date_range)
 filtered_data = merged_data[
