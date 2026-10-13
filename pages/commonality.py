@@ -1,14 +1,11 @@
 import streamlit as st
+from utils.period import setup_page, show_chart
 import pandas as pd
 import plotly.express as px
 
 
 # Set custom page title for sidebar
 st.set_page_config(page_title="Análisis de Coincidencias", layout="wide")
-
-if 'merged_data' not in st.session_state:
-    st.error("Datos no cargados. Por favor, revisa la página principal.")
-    st.stop()
 
 st.header("Análisis de Coincidencias")
 st.write("""
@@ -22,13 +19,8 @@ st.write("""
 - **Para Tickers:** Porcentaje de todos los tenedores únicos que invierten en cada ticker.
 """)
 
-merged_data = st.session_state.merged_data
-merged_data_display = st.session_state.merged_data_display
-
-# Apply global date filter
-if st.session_state.selected_date:
-    merged_data = merged_data[merged_data['Date'] == st.session_state.selected_date]
-    merged_data_display = merged_data_display[merged_data_display['Date'] == st.session_state.selected_date]
+# Datos del período activo (selector global en la barra lateral)
+merged_data, merged_data_display = setup_page("snapshot")
 
 threshold = st.slider("Selecciona el umbral de coincidencia en porcentaje:", 0, 100, 50)
 
@@ -45,7 +37,7 @@ if not filtered_holders.empty:
     fig = px.bar(filtered_holders, x='Owner Name', y='Percentage',
                  title=f"Tenedores Institucionales con más de {threshold}% de Tickers en Común",
                  labels={'Percentage': f'Porcentaje de Tickers Comunes'})
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig, use_container_width=True)
 else:
     st.write(f"No hay tenedores institucionales con más de {threshold}% de tickers en común.")
 
@@ -57,6 +49,6 @@ if not filtered_tickers.empty:
     fig = px.bar(filtered_tickers, x='Ticker', y='Percentage',
                  title=f"Tickers con más de {threshold}% de Tenedores Institucionales en Común",
                  labels={'Percentage': f'Porcentaje de Tenedores Comunes'})
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig, use_container_width=True)
 else:
     st.write(f"No hay tickers con más de {threshold}% de tenedores institucionales en común.")

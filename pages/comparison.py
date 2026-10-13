@@ -1,4 +1,5 @@
 import streamlit as st
+from utils.period import setup_page, show_chart
 import pandas as pd
 import plotly.express as px
 from utils.plotting import plot_venn_like_comparison, plot_matplotlib_venn
@@ -6,10 +7,6 @@ from utils.data_processing import color_percentage
 
 # Set custom page title for sidebar
 st.set_page_config(page_title="Comparación", layout="wide")
-
-if 'merged_data' not in st.session_state:
-    st.error("Datos no cargados. Por favor, revisa la página principal.")
-    st.stop()
 
 st.header("Comparación")
 st.write("""
@@ -19,19 +16,13 @@ st.write("""
 - **Gráfico de Coincidencias:** Aparecerá un diagrama mostrando las coincidencias entre los items seleccionados.
 """)
 
-merged_data = st.session_state.merged_data
-merged_data_display = st.session_state.merged_data_display
-general_data = st.session_state.merged_data
-
-# Apply global date filter
-if st.session_state.selected_date:
-    merged_data = merged_data[merged_data['Date'] == st.session_state.selected_date]
-    merged_data_display = merged_data_display[merged_data_display['Date'] == st.session_state.selected_date]
+# Datos del período activo (selector global en la barra lateral)
+merged_data, merged_data_display = setup_page("snapshot")
 
 comparison_type = st.radio("Elige el tipo de comparación:", ["Tickers", "Tenedores Institucionales"])
 
 if comparison_type == "Tickers":
-    tickers = st.multiselect("Selecciona los Tickers para comparar:", sorted(general_data["Ticker"].unique()))
+    tickers = st.multiselect("Selecciona los Tickers para comparar:", sorted(merged_data["Ticker"].unique()))
     if tickers:
         if len(tickers) in [2, 3]:
             st.subheader("Gráfico de Coincidencias de Tenedores")
@@ -62,7 +53,7 @@ if comparison_type == "Tickers":
         for metric in ["Shares Held", "Percentage Owned", "Individual Holdings Value"]:
             fig = px.bar(comparison_data, x="Ticker", y=metric, color="Owner Name", barmode="group")
             fig.update_layout(title=f"Comparación de {metric} por Ticker", xaxis_title="Ticker", yaxis_title=metric)
-            st.plotly_chart(fig, use_container_width=True)
+            show_chart(fig, use_container_width=True)
 
 elif comparison_type == "Tenedores Institucionales":
     holders = st.multiselect("Selecciona los Tenedores Institucionales para comparar:",
@@ -98,4 +89,4 @@ elif comparison_type == "Tenedores Institucionales":
             fig = px.bar(comparison_data, x="Owner Name", y=metric, color="Ticker", barmode="group")
             fig.update_layout(title=f"Comparación de {metric} por Tenedor Institucional",
                               xaxis_title="Tenedor Institucional", yaxis_title=metric)
-            st.plotly_chart(fig, use_container_width=True)
+            show_chart(fig, use_container_width=True)

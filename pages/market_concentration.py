@@ -1,14 +1,12 @@
 import streamlit as st
-from utils.data_processing import load_data, get_market_caps, preprocess_data
+from utils.period import setup_page, show_chart
 from utils.plotting import plot_market_concentration
 
 st.set_page_config(page_title="Concentración de Mercado", layout="wide")
 st.title("🏛️ Concentración de Mercado por Sector / Industria")
 
-# === Cargar datos ===
-institutional_holders, general_data = load_data()
-live_market_caps = get_market_caps(general_data['Ticker'].unique())
-merged_data, _ = preprocess_data(institutional_holders, general_data, live_market_caps)
+# === Datos del período activo (selector global en la barra lateral) ===
+merged_data, _ = setup_page("snapshot")
 
 # 🔹 Asegurarse de que las columnas existen y rellenar NaN
 for col in ["Sector", "Industry"]:

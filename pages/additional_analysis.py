@@ -5,28 +5,20 @@ import plotly.graph_objects as go
 import yfinance as yf
 import numpy as np                    # ← NECESARIO PARA np.isinf
 from utils.data_processing import color_percentage
+from utils.period import setup_page, show_chart, get_period_data, get_period
 
 # Set custom page title for sidebar
 st.set_page_config(page_title="Análisis Adicional", layout="wide")
 
-if 'merged_data' not in st.session_state:
-    st.error("Datos no cargados. Por favor, revisa la página principal.")
-    st.stop()
-
 st.header("Análisis Adicional")
 
-merged_data = st.session_state.merged_data
-merged_data_display = st.session_state.merged_data_display
-general_data = st.session_state.merged_data
-
-# Apply global date filter
-if st.session_state.selected_date:
-    merged_data = merged_data[merged_data['Date'] == st.session_state.selected_date]
-    merged_data_display = merged_data_display[merged_data_display['Date'] == st.session_state.selected_date]
+# Datos del período activo (selector global en la barra lateral)
+merged_data, merged_data_display = setup_page("snapshot")
+general_data = st.session_state.merged_data  # sin filtrar: datos generales de la empresa y historial completo
 
 # Market Cap Influence
 st.subheader("Impacto de la Propiedad Institucional en la Capitalización de Mercado")
-ticker_cap_list = sorted(general_data['Ticker'].unique())
+ticker_cap_list = sorted(merged_data['Ticker'].unique())
 ticker = st.selectbox("Selecciona un Ticker para análisis de capitalización:", ticker_cap_list)
 if ticker:
     ticker_data = merged_data[merged_data['Ticker'] == ticker]
@@ -47,7 +39,7 @@ if ticker:
 
 # Ownership Concentration
 st.subheader("Concentración de Propiedad")
-ticker_conc_list = sorted(general_data['Ticker'].unique())
+ticker_conc_list = sorted(merged_data['Ticker'].unique())
 ticker_conc = st.selectbox("Selecciona un Ticker para análisis de concentración:", ticker_conc_list)
 top_n = st.slider("Selecciona el número de principales tenedores:", 1, 20, 5)
 if ticker_conc:
@@ -71,11 +63,11 @@ if ticker_conc:
     ], ignore_index=True)
 
     fig = px.pie(pie_data, values='Percentage', names='Owner Name', title=f'Concentración de Propiedad para {ticker_conc}')
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig, use_container_width=True)
 
 # Comparative Analysis Across Tickers
 st.subheader("Comparación Entre Tickers")
-tickers_comp_list = sorted(general_data['Ticker'].unique())
+tickers_comp_list = sorted(merged_data['Ticker'].unique())
 tickers = st.multiselect("Selecciona los Tickers para comparar (Análisis Adicional):", tickers_comp_list)
 if tickers:
     comparison_data = merged_data[merged_data['Ticker'].isin(tickers)]
@@ -105,7 +97,7 @@ if tickers:
                      category_orders={"Owner Name": category_order})
         fig.update_layout(title=f"Comparación de {metric} entre Tickers",
                           xaxis_title="Ticker", yaxis_title=metric, legend_title="Tenedores")
-        st.plotly_chart(fig, use_container_width=True)
+        show_chart(fig, use_container_width=True)
 
 # Sector Analysis
 st.subheader("Análisis por Sector")
@@ -113,33 +105,23 @@ st.write("Nota: Este análisis requiere información sobre sectores, que no est�
 
 # Interactive Data Exploration
 st.subheader("Exploración Interactiva de Datos")
-min_date = merged_data['Date'].min().date()
-max_date = merged_data['Date'].max().date()
-if min_date == max_date:
-    st.info(f"Solo hay datos para una fecha: {min_date}.")
-    date_range = (min_date, max_date)
+st.caption("Un registro por tenedor, ticker y fecha de reporte dentro del período activo "
+           "(se cambia desde la barra lateral).")
+_, events_display = get_period_data("events")
+filtered_data_display = events_display.sort_values(by='Shares Change % num', ascending=False)
+
+if filtered_data_display.empty:
+    st.info("No hay registros en el período seleccionado.")
 else:
-    date_range = st.slider("Selecciona un rango de fechas:",
-                           min_value=min_date, max_value=max_date,
-                           value=(min_date, max_date))
-
-date_range_pandas = pd.to_datetime(date_range)
-filtered_data = merged_data[
-    (merged_data['Date'] >= date_range_pandas[0]) & (merged_data['Date'] <= date_range_pandas[1])
-]
-filtered_data_display = merged_data_display[
-    (merged_data_display['Date'] >= date_range_pandas[0]) & (merged_data_display['Date'] <= date_range_pandas[1])
-]
-filtered_data_display = filtered_data_display.sort_values(by='Shares Change % num', ascending=False)
-
-num_rows = st.slider("Número de filas a mostrar:", 1, min(1000, len(filtered_data_display)), 100)
-display_df = filtered_data_display.head(num_rows)
-display_cols = ['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %',
-                'Individual Holdings Value', 'Change as % of Market Cap']
-styled_df = display_df[display_cols].style.map(color_percentage, subset=["Shares Change %"]).format(
-    {'Change as % of Market Cap': '{:.4f}%'}
-)
-st.dataframe(styled_df)
+    num_rows = st.slider("Número de filas a mostrar:", 1, min(1000, len(filtered_data_display)),
+                         min(100, len(filtered_data_display)))
+    display_df = filtered_data_display.head(num_rows)
+    display_cols = ['Date', 'Ticker', 'Owner Name', 'Shares Held', 'Shares Change', 'Shares Change %',
+                    'Individual Holdings Value', 'Change as % of Market Cap']
+    styled_df = display_df[display_cols].style.map(color_percentage, subset=["Shares Change %"]).format(
+        {'Change as % of Market Cap': '{:.4f}%'}
+    )
+    st.dataframe(styled_df)
 
 # Portfolio Analysis for Holders
 st.subheader("Análisis de Cartera para Tenedores")
@@ -158,14 +140,18 @@ st.subheader("Indicador de Sentimiento a través de Tenencias")
 holder_sent_list = sorted(merged_data['Owner Name'].unique())
 holder = st.selectbox("Selecciona un Tenedor para análisis de sentimiento:", holder_sent_list)
 if holder:
-    holder_sentiment = merged_data[merged_data['Owner Name'] == holder].sort_values('Date')
+    # Serie temporal: se muestra TODO el historial y se resalta el período activo
+    holder_sentiment = general_data[general_data['Owner Name'] == holder].sort_values('Date')
+    _p_start, _p_end = get_period()
+    st.caption("Historial completo de fechas de reporte; la franja sombreada marca el período activo.")
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=holder_sentiment['Date'], y=holder_sentiment['Shares Change'],
                              mode='lines+markers',
                              marker=dict(color=['green' if x > 0 else 'red' for x in holder_sentiment['Shares Change']])))
+    fig.add_vrect(x0=pd.Timestamp(_p_start), x1=pd.Timestamp(_p_end), fillcolor="royalblue", opacity=0.12, line_width=0)
     fig.update_layout(title=f'Sentimiento de {holder} a través de Cambios en Tenencias',
                       xaxis_title='Fecha', yaxis_title='Cambio en Acciones')
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig, use_container_width=True)
 
     st.subheader("Indicador de Sentimiento a través de Cambios % en Tenencias")
     holder_sentiment_noinf = holder_sentiment[~np.isinf(holder_sentiment['Shares Change % num'])]
@@ -174,6 +160,7 @@ if holder:
         go.Scatter(x=holder_sentiment_noinf['Date'], y=holder_sentiment_noinf['Shares Change % num'],
                    mode='lines+markers',
                    marker=dict(color=['green' if x > 0 else 'red' for x in holder_sentiment_noinf['Shares Change % num']])))
+    fig_percent.add_vrect(x0=pd.Timestamp(_p_start), x1=pd.Timestamp(_p_end), fillcolor="royalblue", opacity=0.12, line_width=0)
     fig_percent.update_layout(title=f'Sentimiento de {holder} a través de Cambios % en Tenencias',
                               xaxis_title='Fecha', yaxis_title='Cambio en Acciones %')
-    st.plotly_chart(fig_percent, use_container_width=True)
+    show_chart(fig_percent, use_container_width=True)

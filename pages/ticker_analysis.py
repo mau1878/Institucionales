@@ -1,4 +1,5 @@
 import streamlit as st
+from utils.period import setup_page, show_chart
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -7,10 +8,6 @@ from utils.data_processing import color_percentage
 
 # Set custom page title for sidebar
 st.set_page_config(page_title="Análisis por Ticker", layout="wide")
-
-if 'merged_data' not in st.session_state:
-    st.error("Datos no cargados. Por favor, revisa la página principal.")
-    st.stop()
 
 st.header("Análisis por Ticker")
 st.write("""
@@ -25,16 +22,11 @@ st.write("""
 - **Cambio en Acciones %:** Porcentaje de cambio en las acciones mantenidas (verde para aumentos, rojo para disminuciones).
 """)
 
-merged_data = st.session_state.merged_data
-merged_data_display = st.session_state.merged_data_display
-general_data = st.session_state.merged_data  # Note: general_data is part of merged_data
+# Datos del período activo (selector global en la barra lateral)
+merged_data, merged_data_display = setup_page("snapshot")
+general_data = st.session_state.merged_data  # sin filtrar: datos generales de la empresa (no dependen del período)
 
-# Apply global date filter
-if st.session_state.selected_date:
-    merged_data = merged_data[merged_data['Date'] == st.session_state.selected_date]
-    merged_data_display = merged_data_display[merged_data_display['Date'] == st.session_state.selected_date]
-
-tickers_list = sorted(general_data["Ticker"].unique())
+tickers_list = sorted(merged_data["Ticker"].unique())
 selected_ticker = st.selectbox("Selecciona un Ticker:", tickers_list)
 
 ticker_data = merged_data[merged_data["Ticker"] == selected_ticker]
@@ -79,7 +71,7 @@ if not ticker_data.empty:
                      title=f"Tenencias Más Valiosas en {selected_ticker} (en millones USD)",
                      color_discrete_sequence=["blue"])
     fig_val.update_layout(xaxis_title="Tenedor Institucional", yaxis_title="Valor Total (millones USD)")
-    st.plotly_chart(fig_val, use_container_width=True)
+    show_chart(fig_val, use_container_width=True)
 
     st.write("### Rank de Cambios en Posiciones Más Valiosos (por USD)")
     ticker_change_sorted = ticker_data.sort_values(by="Change in Value", ascending=False).head(20)
@@ -91,6 +83,6 @@ if not ticker_data.empty:
         title=f"Cambios Más Valiosos en Posiciones para {selected_ticker} (en millones USD)",
         xaxis_title="Tenedor Institucional", yaxis_title="Cambio en Valor (millones USD)"
     )
-    st.plotly_chart(fig_change, use_container_width=True)
+    show_chart(fig_change, use_container_width=True)
 else:
     st.write("No hay datos disponibles para el ticker seleccionado.")

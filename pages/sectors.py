@@ -1,6 +1,6 @@
 import streamlit as st
+from utils.period import setup_page, show_chart
 import pandas as pd
-from utils.data_processing import load_data, get_market_caps, preprocess_data
 from utils.plotting import (
     plot_top_20,
     plot_holder_composition,
@@ -14,10 +14,8 @@ from utils.plotting import (
 st.set_page_config(page_title="Tenedores Institucionales por Sector e Industria", layout="wide")
 st.title("🏦 Tenedores Institucionales por Sector e Industria")
 
-# === Cargar datos ===
-institutional_holders, general_data = load_data()
-live_market_caps = get_market_caps(general_data['Ticker'].unique())
-merged_data, merged_data_display = preprocess_data(institutional_holders, general_data, live_market_caps)
+# === Datos del período activo (selector global en la barra lateral) ===
+merged_data, merged_data_display = setup_page("snapshot")
 
 # 🔹 Asegurarse de que las columnas existen y rellenar NaN
 for col in ["Sector", "Industry"]:

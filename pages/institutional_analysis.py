@@ -1,4 +1,5 @@
 import streamlit as st
+from utils.period import setup_page, show_chart
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -7,10 +8,6 @@ from utils.data_processing import color_percentage
 
 # Set custom page title for sidebar
 st.set_page_config(page_title="Análisis de Tenedores", layout="wide")
-
-if 'merged_data' not in st.session_state:
-    st.error("Datos no cargados. Por favor, revisa la página principal.")
-    st.stop()
 
 st.header("Análisis de Tenedor Institucional")
 st.write("""
@@ -24,13 +21,8 @@ st.write("""
 - **Cambio en Acciones %:** Porcentaje de cambio en las acciones mantenidas (verde para aumentos, rojo para disminuciones).
 """)
 
-merged_data = st.session_state.merged_data
-merged_data_display = st.session_state.merged_data_display
-
-# Apply global date filter
-if st.session_state.selected_date:
-    merged_data = merged_data[merged_data['Date'] == st.session_state.selected_date]
-    merged_data_display = merged_data_display[merged_data_display['Date'] == st.session_state.selected_date]
+# Datos del período activo (selector global en la barra lateral)
+merged_data, merged_data_display = setup_page("snapshot")
 
 institutional_holders_list = sorted(merged_data["Owner Name"].unique())
 selected_holder = st.selectbox("Selecciona un Tenedor Institucional:", institutional_holders_list)
@@ -68,7 +60,7 @@ if not holder_data.empty:
                      title=f"Tenencias Más Valiosas de {selected_holder} (en millones USD)",
                      color_discrete_sequence=["blue"])
     fig_val.update_layout(xaxis_title="Ticker", yaxis_title="Valor Total (millones USD)")
-    st.plotly_chart(fig_val, use_container_width=True)
+    show_chart(fig_val, use_container_width=True)
 
     st.write("### Rank de Cambios en Posiciones Más Valiosos (por USD)")
     holder_change_sorted = holder_data.sort_values(by="Change in Value", ascending=False).head(20)
@@ -80,6 +72,6 @@ if not holder_data.empty:
         title=f"Cambios Más Valiosos en Posiciones de {selected_holder} (en millones USD)",
         xaxis_title="Ticker", yaxis_title="Cambio en Valor (millones USD)"
     )
-    st.plotly_chart(fig_change, use_container_width=True)
+    show_chart(fig_change, use_container_width=True)
 else:
     st.write("No hay datos disponibles para el tenedor institucional seleccionado.")
