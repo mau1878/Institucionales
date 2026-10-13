@@ -1,49 +1,39 @@
 import streamlit as st
 import pandas as pd
-from utils.data_processing import load_data, get_market_caps, preprocess_data
+from utils.data_processing import preprocess_data
+from utils.period import ensure_data_loaded, render_period_selector, render_period_banner, _coverage, _fmt
 
 st.set_page_config(page_title="Análisis de Tenencias Institucionales", layout="wide")
-st.header("POR FAVOR ESPERAR A QUE SE CARGUEN LOS DATOS Y SE DIGA QUE SE CARGARON CON ÉXITO!!!")
-# Initialize session state for data
-if 'merged_data' not in st.session_state:
-    try:
-        with st.spinner('Cargando datos...'):
-            institutional_holders, general_data = load_data()
-            if institutional_holders.empty or general_data.empty:
-                raise ValueError("Uno o ambos archivos parquet están vacíos.")
-            live_market_caps = get_market_caps(general_data['Ticker'].unique())
-            merged_data, merged_data_display = preprocess_data(institutional_holders, general_data, live_market_caps)
-            st.session_state.merged_data = merged_data
-            st.session_state.merged_data_display = merged_data_display
-            st.session_state.unique_dates = sorted(merged_data['Date'].dt.date.unique())
-            st.success("Datos cargados con éxito.")
-    except FileNotFoundError as e:
-        st.error(f"Error: No se encontraron los archivos parquet. Asegúrate de que 'institutional_holders.parquet' y 'general_data.parquet' estén en el directorio raíz. Detalles: {str(e)}")
-        st.stop()
-    except Exception as e:
-        st.error(f"Error al cargar los datos: {str(e)}")
-        st.stop()
+
+# Carga de datos (se hace una sola vez por sesión; las demás páginas lo reutilizan)
+ensure_data_loaded()
+
+# Selector de período global (también se muestra en todas las páginas)
+render_period_selector()
+
+st.title("Análisis de Tenencias Institucionales")
+st.write("Selecciona una página desde la barra lateral para continuar.")
+render_period_banner("snapshot")
+
+
 # Función para limpiar cache
 def clear_preprocess_cache():
     """Borra forzosamente el cache de preprocess_data."""
     preprocess_data.clear()
+    for key in ("merged_data", "merged_data_display", "unique_dates", "_coverage"):
+        st.session_state.pop(key, None)
     st.success("Cache de datos forzadamente borrado. Los datos se regenerarán al recargar.")
+
 
 # Botón para limpiar cache
 if st.button("Regenerar datos"):
     clear_preprocess_cache()
-# Global date filter
-try:
-    st.sidebar.header("Filtro por Fecha")
-    selected_date = st.sidebar.selectbox(
-        "Selecciona una Fecha (opcional):",
-        [None] + st.session_state.unique_dates,
-        key='global_date_filter'
-    )
-    st.session_state.selected_date = pd.to_datetime(selected_date) if selected_date else None
-except KeyError:
-    st.error("No se pudieron cargar las fechas únicas. Los datos no están inicializados correctamente.")
-    st.stop()
 
-st.title("Análisis de Tenencias Institucionales")
-st.write("Selecciona una página desde la barra lateral para continuar.")
+st.subheader("Fechas de reporte disponibles")
+st.write(
+    "Cada fecha corresponde al cierre de un trimestre. El 13-F se presenta hasta 45 días después, "
+    "por lo que las fechas más recientes pueden estar incompletas."
+)
+cov = _coverage().rename_axis("Fecha de reporte").reset_index()
+cov["Fecha de reporte"] = cov["Fecha de reporte"].map(_fmt)
+st.dataframe(cov, hide_index=True, use_container_width=True)
