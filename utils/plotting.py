@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from utils.period import show_chart, period_label
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
@@ -19,7 +20,7 @@ def plot_top_20(df, x, y, title, color):
 
     fig = px.bar(top_20, x=x, y=y, title=title, color_discrete_sequence=[color])
     fig.update_layout(xaxis_title=x, yaxis_title=y)
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
 
 # === Gráfico de cambios ===
 def plot_changes(df, x, y_num, title, is_percentage=False):
@@ -29,7 +30,7 @@ def plot_changes(df, x, y_num, title, is_percentage=False):
     colors = ['green' if val > 0 else 'red' if val < 0 else 'grey' for val in top_20[y_num]]
     fig = go.Figure(data=[go.Bar(x=top_20[x], y=top_20[y_num], marker_color=colors)])
     fig.update_layout(title=title, xaxis_title=x, yaxis_title='Shares Change %' if is_percentage else 'Shares Change')
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
 
 # === Diagrama tipo Venn con Plotly ===
 def plot_venn_like_comparison(item_list, comparison_field, data):
@@ -138,7 +139,7 @@ def plot_venn_like_comparison(item_list, comparison_field, data):
                        x=0.5, y=0.5, showarrow=False,
                        font=dict(size=30,color="rgba(0,0,0,0.2)"), textangle=-30,
                        xanchor="center", yanchor="middle", opacity=0.2)
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
 
 # === Diagramas de Venn con matplotlib ===
 def plot_matplotlib_venn(item_list, comparison_field, data):
@@ -163,7 +164,7 @@ def plot_matplotlib_venn(item_list, comparison_field, data):
         venn2(subsets=sets, set_labels=set_labels, ax=ax)
     elif num_items == 3:
         venn3(subsets=sets, set_labels=set_labels, ax=ax)
-    ax.set_title(title)
+    ax.set_title(f"{title}\n📅 {period_label()}")
 
     # Marca de agua
     ax.text(0.5,0.5,"M Taurus - X: @mtaurus_ok",transform=ax.transAxes,
@@ -181,7 +182,7 @@ def plot_sector_industry(df, group_field, value_field="Valor Total (USD millones
                  title=f"Distribución de {group_field} por Valor Total en holdings institucionales",
                  color_discrete_sequence=px.colors.qualitative.Set3)
     fig.update_traces(textposition='inside', textinfo='percent+label')
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
 
 # === Composición de cartera de un tenedor ===
 def plot_holder_composition(merged_data, holder_name, group_field="Sector"):
@@ -191,7 +192,7 @@ def plot_holder_composition(merged_data, holder_name, group_field="Sector"):
         return
     holder_group = holder_data.groupby(group_field)["Individual Holdings Value"].sum().reset_index().sort_values("Individual Holdings Value", ascending=False)
     fig = px.pie(holder_group, names=group_field, values="Individual Holdings Value", title=f"Composición de cartera de {holder_name} por {group_field}", hole=0.3)
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
 
 # === Distribución de holdings por tenedor ===
 def plot_holder_distribution(merged_data, group_field):
@@ -224,7 +225,7 @@ def plot_holder_distribution(merged_data, group_field):
         height=600
     )
     fig.update_layout(barmode='stack', xaxis={'categoryorder':'total descending'})
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
     st.write("✅ plot_holder_distribution ejecutada")
 
 def plot_holders_heatmap(merged_data, group_field):
@@ -256,7 +257,7 @@ def plot_holders_heatmap(merged_data, group_field):
         aspect="auto",
         color_continuous_scale="RdYlGn"
     )
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
     st.write("✅ plot_holders_heatmap ejecutada")
 
 def plot_market_concentration(merged_data, group_field, top_n=5, top_bottom="Top N"):
@@ -305,7 +306,7 @@ def plot_market_concentration(merged_data, group_field, top_n=5, top_bottom="Top
         labels={"Pct of Group": "% del grupo", "Owner Name": "Tenedor"},
         height=600
     )
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
 
 
 
@@ -339,5 +340,5 @@ def plot_multiple_holders_comparison(merged_data, selected_holders, group_field)
         height=600
     )
     fig.update_layout(barmode='stack', xaxis={'categoryorder':'total descending'})
-    st.plotly_chart(fig, use_container_width=True)
+    show_chart(fig)
     st.write("✅ plot_multiple_holders_comparison ejecutada")
